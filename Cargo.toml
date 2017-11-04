@@ -1,0 +1,20 @@
+[package]
+name = "relative-path"
+version = "0.1.0"
+authors = ["John-John Tedro <udoprog@tedro.se>"]
+license = "MIT/Apache-2.0"
+repository = "https://github.com/udoprog/relative-path"
+homepage = "https://docs.rs/crate/relative-path/"
+documentation = "https://docs.rs/crate/relative-path/"
+description = """
+Portable, relative paths for Rust.
+"""
+readme = "README.md"
+
+[features]
+default = []
+
+ci = ["serde"]
+
+[dependencies]
+serde = { version = "1.0", optional = true }

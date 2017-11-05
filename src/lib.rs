@@ -31,60 +31,87 @@ use serde::ser::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 
 const SEP: char = '/';
+const SEP_BYTE: u8 = SEP as u8;
 
 /// Iterator over all the components in a relative path.
 #[derive(Clone)]
 pub struct Components<'a> {
-    iter: ::std::str::CharIndices<'a>,
-    source: &'a str,
-    index: usize,
-    last_sep: bool,
+    source: &'a [u8],
 }
 
 impl<'a> Iterator for Components<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((i, c)) = self.iter.next() {
-            if c == SEP {
-                if self.last_sep {
-                    continue;
-                }
-
-                let o = self.index;
-                self.index = i;
-                self.last_sep = true;
-                return Some(&self.source[o..i]);
-            }
-
-            if self.last_sep {
-                self.last_sep = false;
-                self.index = i;
-            }
-        }
-
-        if self.source.len() <= self.index {
+        if self.source.is_empty() {
             return None;
         }
 
-        if self.last_sep {
-            self.index = self.source.len();
+        let mut start = 0usize;
+
+        // strip prefixing separators
+        while start < self.source.len() && self.source[start] == SEP_BYTE {
+            start += 1;
+        }
+
+        let mut end = start;
+
+        // strip prefixing separators
+        while end < self.source.len() && self.source[end] != SEP_BYTE {
+            end += 1;
+        }
+
+        let slice = &self.source[start..end];
+        self.source = &self.source[end..];
+
+        if slice.is_empty() {
             return None;
         }
 
-        let o = self.index;
-        self.index = self.source.len();
-        Some(&self.source[o..])
+        Some(unsafe { ::std::str::from_utf8_unchecked(slice) })
+    }
+}
+
+impl<'a> DoubleEndedIterator for Components<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.source.is_empty() {
+            return None;
+        }
+
+        let mut end = self.source.len();
+
+        // strip suffixing separators
+        while end > 0 && self.source[end - 1] == SEP_BYTE {
+            end -= 1;
+        }
+
+        let mut start = end;
+
+        // find component
+        while start > 0 && self.source[start - 1] != SEP_BYTE {
+            start -= 1;
+        }
+
+        // strip prefixing separator
+        while start > 0 && self.source[start - 1] == SEP_BYTE {
+            start -= 1;
+        }
+
+        let slice = &self.source[start..end];
+        self.source = &self.source[..start];
+
+        if slice.is_empty() {
+            return None;
+        }
+
+        Some(unsafe { ::std::str::from_utf8_unchecked(slice) })
     }
 }
 
 impl<'a> Components<'a> {
     pub fn new(input: &str) -> Components {
         Components {
-            iter: input.char_indices(),
-            source: input,
-            index: 0usize,
-            last_sep: true,
+            source: input.as_bytes(),
         }
     }
 }
@@ -109,15 +136,6 @@ impl RelativePathBuf {
         RelativePathBuf { inner: String::new() }
     }
 
-    /// Creates an owned [`RelativePathBuf`] with `path` adjoined to self.
-    ///
-    /// [`RelativePathBuf`]: struct.RelativePathBuf.html
-    pub fn join<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
-        let mut out = self.to_relative_path_buf();
-        out.push(path);
-        out
-    }
-
     /// Extends `self` with `path`.
     ///
     /// If `path` is absolute, it replaces the current path.
@@ -135,41 +153,6 @@ impl RelativePathBuf {
         }
 
         self.inner.push_str(&other.inner)
-    }
-
-    /// Convert to an owned [`RelativePathBuf`].
-    ///
-    /// [`RelativePathBuf`]: struct.RelativePathBuf.html
-    pub fn to_relative_path_buf(&self) -> RelativePathBuf {
-        RelativePathBuf::from(self.inner.to_string())
-    }
-
-    /// Iterate over all components in this relative path.
-    ///
-    /// Skips over the separator.
-    pub fn components(&self) -> Components {
-        Components::new(&self.inner)
-    }
-
-    /// Build an owned `PathBuf` relative to `path` for the current relative path.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use relative_path::RelativePath;
-    /// use std::path::Path;
-    ///
-    /// let path_buf = RelativePath::new("foo/bar").to_relative_of(Path::new("."));
-    /// ```
-    pub fn to_relative_of<P: AsRef<path::Path>>(&self, path: P) -> path::PathBuf {
-        let mut p = path.as_ref().to_path_buf();
-        p.extend(self.components());
-        p
-    }
-
-    /// Check if path starts with a path separator.
-    pub fn is_absolute(&self) -> bool {
-        self.inner.chars().next() == Some(SEP)
     }
 
     /// Coerce to a [`RelativePath`] slice.
@@ -320,7 +303,16 @@ impl RelativePath {
         RelativePathBuf::from(self.inner.to_string())
     }
 
-    /// Create a new path buffer relative to the given path.
+    /// Build an owned `PathBuf` relative to `path` for the current relative path.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    /// use std::path::Path;
+    ///
+    /// let _ = RelativePath::new("foo/bar").to_relative_of(Path::new("."));
+    /// ```
     pub fn to_relative_of<P: AsRef<path::Path>>(&self, relative_to: P) -> path::PathBuf {
         let mut p = relative_to.as_ref().to_path_buf();
         p.extend(self.components());
@@ -330,6 +322,19 @@ impl RelativePath {
     /// Check if path starts with a path separator.
     pub fn is_absolute(&self) -> bool {
         self.inner.chars().next() == Some(SEP)
+    }
+
+    /// Returns a relative path, without its final component if there is one.
+    pub fn parent(&self) -> Option<&RelativePath> {
+        self.components().next_back().and_then(|part| {
+            let slice = &self.inner[.. self.inner.len() - part.len()];
+
+            if slice.is_empty() {
+                None
+            } else {
+                Some(RelativePath::new(slice))
+            }
+        })
     }
 }
 
@@ -528,5 +533,27 @@ mod tests {
         assert_eq!(rp("foo///bar"), rp("foo/bar"));
         assert_eq!(rp("foo"), rp("foo"));
         assert_eq!(rp("foo"), rp("foo").to_relative_path_buf());
+    }
+
+    #[test]
+    fn test_next_back() {
+        let mut it = rp("baz/bar///foo").components();
+        assert_eq!(Some("///foo"), it.next_back());
+        assert_eq!(Some("/bar"), it.next_back());
+        assert_eq!(Some("baz"), it.next_back());
+        assert_eq!(None, it.next_back());
+    }
+
+    #[test]
+    fn test_parent() {
+        let path = rp("baz/bar///foo");
+        assert_eq!(Some(rp("baz/bar")), path.parent());
+        assert_eq!(Some(rp("baz")), path.parent().and_then(RelativePath::parent));
+        assert_eq!(None, path.parent().and_then(RelativePath::parent).and_then(RelativePath::parent));
+    }
+
+    #[test]
+    fn test_relative_path_buf() {
+        assert_eq!(rp("hello/world/."), rp("/hello///world//").to_owned().join("."));
     }
 }

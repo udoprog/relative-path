@@ -18,6 +18,8 @@ use std::path;
 use std::fmt;
 use std::ops;
 use std::cmp;
+#[cfg(feature = "serde")]
+use std::result;
 
 #[cfg(feature = "serde")]
 extern crate serde;

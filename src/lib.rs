@@ -74,11 +74,23 @@ impl<'a> Iterator for Components<'a> {
 
 impl<'a> DoubleEndedIterator for Components<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
+        self.next_back_component().map(|(s, _)| s)
+    }
+}
+
+impl<'a> Components<'a> {
+    pub fn new(input: &str) -> Components {
+        Components { source: input.as_bytes() }
+    }
+
+    /// Extracts the next back component and its length including separators.
+    fn next_back_component(&mut self) -> Option<(&'a str, usize)> {
         if self.source.is_empty() {
             return None;
         }
 
         let mut end = self.source.len();
+        let slice_end = end;
 
         // strip suffixing separators
         while end > 0 && self.source[end - 1] == SEP_BYTE {
@@ -93,24 +105,21 @@ impl<'a> DoubleEndedIterator for Components<'a> {
         }
 
         // strip prefixing separator
-        while start > 0 && self.source[start - 1] == SEP_BYTE {
-            start -= 1;
+        let mut slice_start = start;
+
+        while slice_start > 0 && self.source[slice_start - 1] == SEP_BYTE {
+            slice_start -= 1;
         }
 
         let slice = &self.source[start..end];
-        self.source = &self.source[..start];
+        self.source = &self.source[..slice_start];
 
         if slice.is_empty() {
             return None;
         }
 
-        Some(unsafe { ::std::str::from_utf8_unchecked(slice) })
-    }
-}
-
-impl<'a> Components<'a> {
-    pub fn new(input: &str) -> Components {
-        Components { source: input.as_bytes() }
+        let slice = unsafe { ::std::str::from_utf8_unchecked(slice) };
+        Some((slice, slice_end - slice_start))
     }
 }
 
@@ -324,15 +333,17 @@ impl RelativePath {
 
     /// Returns a relative path, without its final component if there is one.
     pub fn parent(&self) -> Option<&RelativePath> {
-        self.components().next_back().and_then(|part| {
-            let slice = &self.inner[..self.inner.len() - part.len()];
+        self.components().next_back_component().and_then(
+            |(_, size)| {
+                let slice = &self.inner[..self.inner.len() - size];
 
-            if slice.is_empty() {
-                None
-            } else {
-                Some(RelativePath::new(slice))
-            }
-        })
+                if slice.is_empty() {
+                    None
+                } else {
+                    Some(RelativePath::new(slice))
+                }
+            },
+        )
     }
 }
 
@@ -536,18 +547,18 @@ mod tests {
     #[test]
     fn test_next_back() {
         let mut it = rp("baz/bar///foo").components();
-        assert_eq!(Some("///foo"), it.next_back());
-        assert_eq!(Some("/bar"), it.next_back());
+        assert_eq!(Some("foo"), it.next_back());
+        assert_eq!(Some("bar"), it.next_back());
         assert_eq!(Some("baz"), it.next_back());
         assert_eq!(None, it.next_back());
     }
 
     #[test]
     fn test_parent() {
-        let path = rp("baz/bar///foo");
-        assert_eq!(Some(rp("baz/bar")), path.parent());
+        let path = rp("/baz//bar/foo//");
+        assert_eq!(Some(rp("/baz/bar")), path.parent());
         assert_eq!(
-            Some(rp("baz")),
+            Some(rp("/baz")),
             path.parent().and_then(RelativePath::parent)
         );
         assert_eq!(

@@ -1,5 +1,6 @@
 // This file contains parts that are Copyright 2015 The Rust Project Developers, copied from:
-// https://raw.githubusercontent.com/rust-lang/rust/cb2a656cdfb6400ac0200c661267f91fabf237e2/src/libstd/path.rs
+// https://github.com/rust-lang/rust
+// cb2a656cdfb6400ac0200c661267f91fabf237e2 src/libstd/path.rs
 
 //! A platform-neutral relative path.
 //!

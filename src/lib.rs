@@ -33,6 +33,32 @@ use serde::de::{self, Deserialize, Deserializer, Visitor};
 const SEP: char = '/';
 const SEP_BYTE: u8 = SEP as u8;
 
+/// Scan backwards until the given separator has been encountered using the provided `cmp`.
+macro_rules! scan_back {
+    ($source:expr, $init:expr, $cmp:tt, $sep:expr) => {{
+            let mut n = $init;
+
+            while n > 0 && $source[n - 1] $cmp $sep {
+                n -= 1;
+            }
+
+            n
+    }}
+}
+
+/// Scan forward until the given separator has been encountered using the provided `cmp`.
+macro_rules! scan_forward {
+    ($source:expr, $init:expr, $cmp:tt, $sep:expr) => {{
+        let mut n = $init;
+
+        while n < $source.len() && $source[n] $cmp $sep {
+            n += 1;
+        }
+
+        n
+    }}
+}
+
 /// Iterator over all the components in a relative path.
 #[derive(Clone)]
 pub struct Components<'a> {
@@ -47,19 +73,10 @@ impl<'a> Iterator for Components<'a> {
             return None;
         }
 
-        let mut start = 0usize;
-
         // strip prefixing separators
-        while start < self.source.len() && self.source[start] == SEP_BYTE {
-            start += 1;
-        }
-
-        let mut end = start;
-
-        // strip prefixing separators
-        while end < self.source.len() && self.source[end] != SEP_BYTE {
-            end += 1;
-        }
+        let start = scan_forward!(self.source, 0usize, ==, SEP_BYTE);
+        // collect component
+        let end = scan_forward!(self.source, start, !=, SEP_BYTE);
 
         let slice = &self.source[start..end];
         self.source = &self.source[end..];
@@ -89,27 +106,14 @@ impl<'a> Components<'a> {
             return None;
         }
 
-        let mut end = self.source.len();
-        let slice_end = end;
+        let slice_end = self.source.len();
 
         // strip suffixing separators
-        while end > 0 && self.source[end - 1] == SEP_BYTE {
-            end -= 1;
-        }
-
-        let mut start = end;
-
+        let end = scan_back!(self.source, slice_end, ==, SEP_BYTE);
         // find component
-        while start > 0 && self.source[start - 1] != SEP_BYTE {
-            start -= 1;
-        }
-
+        let start = scan_back!(self.source, end, !=, SEP_BYTE);
         // strip prefixing separator
-        let mut slice_start = start;
-
-        while slice_start > 0 && self.source[slice_start - 1] == SEP_BYTE {
-            slice_start -= 1;
-        }
+        let slice_start = scan_back!(self.source, start, ==, SEP_BYTE);
 
         let slice = &self.source[start..end];
         self.source = &self.source[..slice_start];

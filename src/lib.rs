@@ -110,9 +110,7 @@ impl<'a> DoubleEndedIterator for Components<'a> {
 
 impl<'a> Components<'a> {
     pub fn new(input: &str) -> Components {
-        Components {
-            source: input.as_bytes(),
-        }
+        Components { source: input.as_bytes() }
     }
 }
 
@@ -327,7 +325,7 @@ impl RelativePath {
     /// Returns a relative path, without its final component if there is one.
     pub fn parent(&self) -> Option<&RelativePath> {
         self.components().next_back().and_then(|part| {
-            let slice = &self.inner[.. self.inner.len() - part.len()];
+            let slice = &self.inner[..self.inner.len() - part.len()];
 
             if slice.is_empty() {
                 None
@@ -548,12 +546,23 @@ mod tests {
     fn test_parent() {
         let path = rp("baz/bar///foo");
         assert_eq!(Some(rp("baz/bar")), path.parent());
-        assert_eq!(Some(rp("baz")), path.parent().and_then(RelativePath::parent));
-        assert_eq!(None, path.parent().and_then(RelativePath::parent).and_then(RelativePath::parent));
+        assert_eq!(
+            Some(rp("baz")),
+            path.parent().and_then(RelativePath::parent)
+        );
+        assert_eq!(
+            None,
+            path.parent().and_then(RelativePath::parent).and_then(
+                RelativePath::parent,
+            )
+        );
     }
 
     #[test]
     fn test_relative_path_buf() {
-        assert_eq!(rp("hello/world/."), rp("/hello///world//").to_owned().join("."));
+        assert_eq!(
+            rp("hello/world/."),
+            rp("/hello///world//").to_owned().join(".")
+        );
     }
 }

@@ -25,12 +25,12 @@ Windows to build projects which work on their platform, but not others.
 components.
 
 Conversion to `Path` can only happen if it is known which path it is relative to, through the
-`to_path_buf` function. This is where the 'relative' part of the name comes from.
+`to_relative_of` function. This is where the 'relative' part of the name comes from.
 
 ```rust
 let relative_path = RelativePath::new("foo/bar");
 let path = Path::new("C:\\");
-let full_path = relative_path.to_path_buf(path);
+let full_path = relative_path.to_relative_of(path);
 ```
 
 This would for example, permit relative paths to portably be used in project manifests or

@@ -11,6 +11,7 @@
 //!   apply to operations involving relative paths, they will be considered as relative to the
 //!   path provided during conversion.
 
+use std::hash::{Hash, Hasher};
 use std::mem;
 use std::borrow;
 use std::borrow::Cow;
@@ -36,8 +37,8 @@ const SEP: char = '/';
 pub struct Components<'a> {
     iter: ::std::str::CharIndices<'a>,
     source: &'a str,
-    last_slash: bool,
-    offset: usize,
+    index: usize,
+    last_sep: bool,
 }
 
 impl<'a> Iterator for Components<'a> {
@@ -46,33 +47,45 @@ impl<'a> Iterator for Components<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((i, c)) = self.iter.next() {
             if c == SEP {
-                if !self.last_slash {
-                    let start = self.offset;
-                    self.offset = i;
-                    self.last_slash = true;
-                    return Some(&self.source[start..i]);
+                if self.last_sep {
+                    continue;
                 }
 
-                continue;
+                let o = self.index;
+                self.index = i;
+                self.last_sep = true;
+                return Some(&self.source[o..i]);
             }
 
-            if self.last_slash {
-                self.last_slash = false;
-                self.offset = i;
-            }
-        }
-
-        if self.source.len() > self.offset {
-            if self.last_slash {
-                self.offset = self.source.len();
-            } else {
-                let start = self.offset;
-                self.offset = self.source.len();
-                return Some(&self.source[start..]);
+            if self.last_sep {
+                self.last_sep = false;
+                self.index = i;
             }
         }
 
-        None
+        if self.source.len() <= self.index {
+            return None;
+        }
+
+        if self.last_sep {
+            self.index = self.source.len();
+            return None;
+        }
+
+        let o = self.index;
+        self.index = self.source.len();
+        Some(&self.source[o..])
+    }
+}
+
+impl<'a> Components<'a> {
+    pub fn new(input: &str) -> Components {
+        Components {
+            iter: input.char_indices(),
+            source: input,
+            index: 0usize,
+            last_sep: true,
+        }
     }
 }
 
@@ -91,23 +104,23 @@ pub struct RelativePathBuf {
 }
 
 impl RelativePathBuf {
-    /// Create a new relative path buffer, guaranteeing that it is relative.
-    ///
-    /// A relative path is one that does not start with a path separator (`/`).
+    /// Create a new relative path buffer.
     pub fn new() -> RelativePathBuf {
         RelativePathBuf { inner: String::new() }
     }
 
-    /// Join this relative path with another relative path.
+    /// Creates an owned [`RelativePathBuf`] with `path` adjoined to self.
+    ///
+    /// [`RelativePathBuf`]: struct.RelativePathBuf.html
     pub fn join<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
         let mut out = self.to_relative_path_buf();
         out.push(path);
         out
     }
 
-    /// Push another relative path to this path.
+    /// Extends `self` with `path`.
     ///
-    /// * Ignore sequences of separators (`/`).
+    /// If `path` is absolute, it replaces the current path.
     pub fn push<P: AsRef<RelativePath>>(&mut self, path: P) {
         let other = path.as_ref();
 
@@ -124,7 +137,9 @@ impl RelativePathBuf {
         self.inner.push_str(&other.inner)
     }
 
-    /// Convert to an owned `RelativePathBuf`.
+    /// Convert to an owned [`RelativePathBuf`].
+    ///
+    /// [`RelativePathBuf`]: struct.RelativePathBuf.html
     pub fn to_relative_path_buf(&self) -> RelativePathBuf {
         RelativePathBuf::from(self.inner.to_string())
     }
@@ -133,17 +148,10 @@ impl RelativePathBuf {
     ///
     /// Skips over the separator.
     pub fn components(&self) -> Components {
-        Components {
-            iter: self.inner.char_indices(),
-            source: &self.inner,
-            last_slash: true,
-            offset: 0,
-        }
+        Components::new(&self.inner)
     }
 
-    /// Create a new path buffer relative to the given path.
-    ///
-    /// The created path will be relative to the provided `relative_to` argument.
+    /// Build an owned `PathBuf` relative to `path` for the current relative path.
     ///
     /// # Examples
     ///
@@ -153,8 +161,8 @@ impl RelativePathBuf {
     ///
     /// let path_buf = RelativePath::new("foo/bar").to_relative_of(Path::new("."));
     /// ```
-    pub fn to_relative_of<P: AsRef<path::Path>>(&self, relative_to: P) -> path::PathBuf {
-        let mut p = relative_to.as_ref().to_path_buf();
+    pub fn to_relative_of<P: AsRef<path::Path>>(&self, path: P) -> path::PathBuf {
+        let mut p = path.as_ref().to_path_buf();
         p.extend(self.components());
         p
     }
@@ -162,6 +170,13 @@ impl RelativePathBuf {
     /// Check if path starts with a path separator.
     pub fn is_absolute(&self) -> bool {
         self.inner.chars().next() == Some(SEP)
+    }
+
+    /// Coerce to a [`RelativePath`] slice.
+    ///
+    /// [`RelativePath`]: struct.RelativePath.html
+    pub fn as_relative_path(&self) -> &RelativePath {
+        self
     }
 }
 
@@ -214,6 +229,12 @@ impl cmp::PartialOrd for RelativePathBuf {
 impl cmp::Ord for RelativePathBuf {
     fn cmp(&self, other: &RelativePathBuf) -> cmp::Ordering {
         self.components().cmp(other.components())
+    }
+}
+
+impl Hash for RelativePathBuf {
+    fn hash<H: Hasher>(&self, h: &mut H) {
+        self.as_relative_path().hash(h)
     }
 }
 
@@ -272,7 +293,9 @@ impl RelativePath {
         unsafe { mem::transmute(s.as_ref()) }
     }
 
-    /// Join this relative path with another relative path.
+    /// Creates an owned [`RelativePathBuf`] with path adjoined to self.
+    ///
+    /// [`RelativePathBuf`]: struct.RelativePathBuf.html
     pub fn join<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
         let p = path.as_ref();
 
@@ -287,15 +310,12 @@ impl RelativePath {
 
     /// Iterate over all components in this relative path.
     pub fn components(&self) -> Components {
-        Components {
-            iter: self.inner.char_indices(),
-            source: &self.inner,
-            last_slash: true,
-            offset: 0,
-        }
+        Components::new(&self.inner)
     }
 
-    /// Convert to an owned `RelativePathBuf`.
+    /// Convert to an owned [`RelativePathBuf`].
+    ///
+    /// [`RelativePathBuf`]: struct.RelativePathBuf.html
     pub fn to_relative_path_buf(&self) -> RelativePathBuf {
         RelativePathBuf::from(self.inner.to_string())
     }
@@ -365,6 +385,14 @@ impl cmp::Ord for RelativePath {
     }
 }
 
+impl Hash for RelativePath {
+    fn hash<H: Hasher>(&self, h: &mut H) {
+        for c in self.components() {
+            c.hash(h);
+        }
+    }
+}
+
 #[cfg(feature = "serde")]
 impl Serialize for RelativePath {
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
@@ -379,12 +407,16 @@ macro_rules! impl_cmp {
     ($lhs:ty, $rhs: ty) => {
         impl<'a, 'b> PartialEq<$rhs> for $lhs {
             #[inline]
-            fn eq(&self, other: &$rhs) -> bool { <RelativePath as PartialEq>::eq(self, other) }
+            fn eq(&self, other: &$rhs) -> bool {
+                <RelativePath as PartialEq>::eq(self, other)
+            }
         }
 
         impl<'a, 'b> PartialEq<$lhs> for $rhs {
             #[inline]
-            fn eq(&self, other: &$lhs) -> bool { <RelativePath as PartialEq>::eq(self, other) }
+            fn eq(&self, other: &$lhs) -> bool {
+                <RelativePath as PartialEq>::eq(self, other)
+            }
         }
 
         impl<'a, 'b> PartialOrd<$rhs> for $lhs {
@@ -413,12 +445,16 @@ macro_rules! impl_cmp_str {
     ($lhs:ty, $rhs: ty) => {
         impl<'a, 'b> PartialEq<$rhs> for $lhs {
             #[inline]
-            fn eq(&self, other: &$rhs) -> bool { <RelativePath as PartialEq>::eq(self, other.as_ref()) }
+            fn eq(&self, other: &$rhs) -> bool {
+                <RelativePath as PartialEq>::eq(self, other.as_ref())
+            }
         }
 
         impl<'a, 'b> PartialEq<$lhs> for $rhs {
             #[inline]
-            fn eq(&self, other: &$lhs) -> bool { <RelativePath as PartialEq>::eq(self.as_ref(), other) }
+            fn eq(&self, other: &$lhs) -> bool {
+                <RelativePath as PartialEq>::eq(self.as_ref(), other)
+            }
         }
 
         impl<'a, 'b> PartialOrd<$rhs> for $lhs {
@@ -456,35 +492,31 @@ mod tests {
         assert_eq!(components, &result[..]);
     }
 
+    fn rp(input: &str) -> &RelativePath {
+        RelativePath::new(input)
+    }
+
     #[test]
     fn test_join() {
+        assert_components(&["foo", "bar", "baz"], &rp("foo/bar").join("baz///"));
         assert_components(
             &["foo", "bar", "baz"],
-            &RelativePath::new("foo/bar").join("baz///"),
+            &rp("hello/world").join("///foo/bar/baz"),
         );
-        assert_components(
-            &["foo", "bar", "baz"],
-            &RelativePath::new("hello/world").join("///foo/bar/baz"),
-        );
-        assert_components(
-            &["foo", "bar", "baz"],
-            &RelativePath::new("").join("///foo/bar/baz"),
-        );
+        assert_components(&["foo", "bar", "baz"], &rp("").join("///foo/bar/baz"));
     }
 
     #[test]
     fn test_components_iterator() {
         assert_eq!(
             vec!["hello", "world"],
-            RelativePath::new("/hello///world//")
-                .components()
-                .collect::<Vec<_>>()
+            rp("/hello///world//").components().collect::<Vec<_>>()
         );
     }
 
     #[test]
     fn test_to_path_buf() {
-        let path = RelativePath::new("/hello///world//");
+        let path = rp("/hello///world//");
         let path_buf = path.to_relative_of(Path::new("."));
         let expected = Path::new(".").join("hello").join("world");
         assert_eq!(expected, path_buf);
@@ -492,9 +524,9 @@ mod tests {
 
     #[test]
     fn test_eq() {
-        assert_eq!(RelativePath::new("//foo///bar"), RelativePath::new("/foo/bar"));
-        assert_eq!(RelativePath::new("foo///bar"), RelativePath::new("foo/bar"));
-        assert_eq!(RelativePath::new("foo"), RelativePath::new("foo"));
-        assert_eq!(RelativePath::new("foo"), RelativePath::new("foo").to_relative_path_buf());
+        assert_eq!(rp("//foo///bar"), rp("/foo/bar"));
+        assert_eq!(rp("foo///bar"), rp("foo/bar"));
+        assert_eq!(rp("foo"), rp("foo"));
+        assert_eq!(rp("foo"), rp("foo").to_relative_path_buf());
     }
 }

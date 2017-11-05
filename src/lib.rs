@@ -83,6 +83,7 @@ impl<'a> cmp::PartialEq for Components<'a> {
 /// An owned, mutable relative path.
 ///
 /// This type provides methods to manipulate relative path objects.
+#[derive(Clone)]
 pub struct RelativePathBuf {
     inner: String,
 }

@@ -3,32 +3,53 @@
 
 //! A platform-neutral relative path.
 //!
-//! This library is analogous to `std::path::Path`, and `std::path::PathBuf`, with the exception of
-//! the following characteristics:
+//! This provide types which are analogous to `Path`, and `PathBuf` found in stdlib, with the
+//! following characteristics:
 //!
 //! * The path separator is set to a fixed character (`/`), regardless of platform.
-//! * Relative paths cannot represent an absolute path. Any slash (`/`) prefixes provided will only
-//!   apply to operations involving relative paths, they will be considered as relative to the
-//!   path provided during conversion.
+//! * Relative paths cannot represent an absolute path in the filesystem, without first specifying
+//!   what they are relative to through [`to_path`].
+//!
+//! [`to_path`]: struct.RelativePath.html#method.to_path
+//!
+//! # Absolute Paths
+//!
+//! Relative paths can be absolute. This does not have the same meaning as with `Path`, instead it
+//! only affects how relative paths are adjoined.
+//!
+//! Joining one absolute path, with another effectively replaces it:
+//!
+//! ```rust
+//! use relative_path::RelativePath;
+//!
+//! let path = RelativePath::new("foo/bar").join("/baz");
+//! assert_eq!("/baz", path)
+//! ```
+//!
+//! Using an absolute [`RelativePath`] won't affect how it's converted into a `Path`.
+//!
+//! ```rust
+//! use relative_path::RelativePath;
+//! use std::path::Path;
+//!
+//! let path = RelativePath::new("/baz").to_path(Path::new("."));
+//! assert_eq!(Path::new("./baz"), path)
+//! ```
+//!
+//! # Serde Support
+//!
+//! This library includes serde support that can be enabled with the `serde` feature.
 
+use std::borrow::{Borrow, Cow};
+use std::cmp;
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::mem;
-use std::borrow;
-use std::borrow::Cow;
+use std::ops::{self, Deref};
 use std::path;
-use std::fmt;
-use std::ops;
-use std::cmp;
-#[cfg(feature = "serde")]
-use std::result;
 
 #[cfg(feature = "serde")]
 extern crate serde;
-
-#[cfg(feature = "serde")]
-use serde::ser::{Serialize, Serializer};
-#[cfg(feature = "serde")]
-use serde::de::{self, Deserialize, Deserializer, Visitor};
 
 const SEP: char = '/';
 const SEP_BYTE: u8 = SEP as u8;
@@ -36,13 +57,13 @@ const SEP_BYTE: u8 = SEP as u8;
 /// Scan backwards until the given separator has been encountered using the provided `cmp`.
 macro_rules! scan_back {
     ($source:expr, $init:expr, $cmp:tt, $sep:expr) => {{
-            let mut n = $init;
+        let mut n = $init;
 
-            while n > 0 && $source[n - 1] $cmp $sep {
-                n -= 1;
-            }
+        while n > 0 && $source[n - 1] $cmp $sep {
+            n -= 1;
+        }
 
-            n
+        n
     }}
 }
 
@@ -77,9 +98,11 @@ impl<'a> Iterator for Components<'a> {
         let start = scan_forward!(self.source, 0usize, ==, SEP_BYTE);
         // collect component
         let end = scan_forward!(self.source, start, !=, SEP_BYTE);
+        // strip suffixing separator
+        let slice_end = scan_forward!(self.source, end, ==, SEP_BYTE);
 
         let slice = &self.source[start..end];
-        self.source = &self.source[end..];
+        self.source = &self.source[slice_end..];
 
         if slice.is_empty() {
             return None;
@@ -150,6 +173,18 @@ impl RelativePathBuf {
     /// Extends `self` with `path`.
     ///
     /// If `path` is absolute, it replaces the current path.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use relative_path::{RelativePathBuf, RelativePath};
+    ///
+    /// let mut path = RelativePathBuf::new();
+    /// path.push("foo");
+    /// path.push("bar");
+    ///
+    /// assert_eq!("foo/bar", path);
+    /// ```
     pub fn push<P: AsRef<RelativePath>>(&mut self, path: P) {
         let other = path.as_ref();
 
@@ -186,9 +221,9 @@ impl AsRef<RelativePath> for RelativePathBuf {
     }
 }
 
-impl borrow::Borrow<RelativePath> for RelativePathBuf {
+impl Borrow<RelativePath> for RelativePathBuf {
     fn borrow(&self) -> &RelativePath {
-        RelativePath::new(&self.inner)
+        self.deref()
     }
 }
 
@@ -232,50 +267,6 @@ impl Hash for RelativePathBuf {
     }
 }
 
-#[cfg(feature = "serde")]
-impl Serialize for RelativePathBuf {
-    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.inner)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for RelativePathBuf {
-    fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct RelativePathBufVisitor;
-
-        impl<'de> Visitor<'de> for RelativePathBufVisitor {
-            type Value = RelativePathBuf;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a relative path")
-            }
-
-            fn visit_string<E>(self, input: String) -> result::Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                Ok(RelativePathBuf::from(input))
-            }
-
-            fn visit_str<E>(self, input: &str) -> result::Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                Ok(RelativePathBuf::from(input.to_string()))
-            }
-        }
-
-        deserializer.deserialize_any(RelativePathBufVisitor)
-    }
-}
-
 /// A borrowed, immutable relative path.
 pub struct RelativePath {
     inner: str,
@@ -290,6 +281,15 @@ impl RelativePath {
     /// Creates an owned [`RelativePathBuf`] with path adjoined to self.
     ///
     /// [`RelativePathBuf`]: struct.RelativePathBuf.html
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    ///
+    /// let path = RelativePath::new("foo/bar");
+    /// assert_eq!("foo/bar/baz", path.join("baz"));
+    /// ```
     pub fn join<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
         let p = path.as_ref();
 
@@ -303,6 +303,20 @@ impl RelativePath {
     }
 
     /// Iterate over all components in this relative path.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    ///
+    /// let path = RelativePath::new("foo/bar/baz");
+    /// let mut it = path.components();
+    ///
+    /// assert_eq!(Some("foo"), it.next());
+    /// assert_eq!(Some("bar"), it.next());
+    /// assert_eq!(Some("baz"), it.next());
+    /// assert_eq!(None, it.next());
+    /// ```
     pub fn components(&self) -> Components {
         Components::new(&self.inner)
     }
@@ -322,9 +336,10 @@ impl RelativePath {
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
-    /// let _ = RelativePath::new("foo/bar").to_relative_of(Path::new("."));
+    /// let path = RelativePath::new("foo/bar").to_path(Path::new("."));
+    /// assert_eq!(Path::new("./foo/bar"), path);
     /// ```
-    pub fn to_relative_of<P: AsRef<path::Path>>(&self, relative_to: P) -> path::PathBuf {
+    pub fn to_path<P: AsRef<path::Path>>(&self, relative_to: P) -> path::PathBuf {
         let mut p = relative_to.as_ref().to_path_buf();
         p.extend(self.components());
         p
@@ -336,6 +351,15 @@ impl RelativePath {
     }
 
     /// Returns a relative path, without its final component if there is one.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    ///
+    /// let path = RelativePath::new("foo/bar");
+    /// assert_eq!(Some(RelativePath::new("foo")), path.parent());
+    /// ```
     pub fn parent(&self) -> Option<&RelativePath> {
         self.components().next_back_component().and_then(
             |(_, size)| {
@@ -351,17 +375,23 @@ impl RelativePath {
     }
 }
 
+impl ToOwned for RelativePath {
+    type Owned = RelativePathBuf;
+
+    fn to_owned(&self) -> RelativePathBuf {
+        self.to_relative_path_buf()
+    }
+}
+
 impl fmt::Debug for RelativePath {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "{:?}", &self.inner)
     }
 }
 
-impl ToOwned for RelativePath {
-    type Owned = RelativePathBuf;
-
-    fn to_owned(&self) -> RelativePathBuf {
-        self.to_relative_path_buf()
+impl AsRef<str> for RelativePathBuf {
+    fn as_ref(&self) -> &str {
+        &self.inner
     }
 }
 
@@ -412,10 +442,54 @@ impl Hash for RelativePath {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for RelativePath {
-    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
+impl serde::ser::Serialize for RelativePathBuf {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(&self.inner)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        struct RelativePathBufVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for RelativePathBufVisitor {
+            type Value = RelativePathBuf;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a relative path")
+            }
+
+            fn visit_string<E>(self, input: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(RelativePathBuf::from(input))
+            }
+
+            fn visit_str<E>(self, input: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(RelativePathBuf::from(input.to_string()))
+            }
+        }
+
+        deserializer.deserialize_any(RelativePathBufVisitor)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::ser::Serialize for RelativePath {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
     {
         serializer.serialize_str(&self.inner)
     }
@@ -535,7 +609,7 @@ mod tests {
     #[test]
     fn test_to_path_buf() {
         let path = rp("/hello///world//");
-        let path_buf = path.to_relative_of(Path::new("."));
+        let path_buf = path.to_path(Path::new("."));
         let expected = Path::new(".").join("hello").join("world");
         assert_eq!(expected, path_buf);
     }

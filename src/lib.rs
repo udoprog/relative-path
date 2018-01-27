@@ -200,7 +200,7 @@ impl RelativePathBuf {
     }
 
     /// Create a new relative path buffer from an owned string.
-    pub fn from_string(path: String) -> RelativePathBuf {
+    pub fn from(path: String) -> RelativePathBuf {
         RelativePathBuf { inner: path }
     }
 
@@ -430,7 +430,7 @@ impl RelativePath {
         let mut stack = Vec::new();
         relative_traversal(&mut stack, self.components());
         relative_traversal(&mut stack, path.as_ref().components());
-        RelativePathBuf::from_string(stack.join("/"))
+        RelativePathBuf::from(stack.join("/"))
     }
 
     /// Return a relative path, resolved from the current path by removing all relative components.
@@ -448,7 +448,7 @@ impl RelativePath {
     pub fn relativize(&self) -> RelativePathBuf {
         let mut stack = Vec::new();
         relative_traversal(&mut stack, self.components());
-        RelativePathBuf::from_string(stack.join("/"))
+        RelativePathBuf::from(stack.join("/"))
     }
 }
 
@@ -750,6 +750,14 @@ mod tests {
         assert_eq!(
             rp("../c/e"),
             rp("x/y").relativize_with("../../a/b/../../../c/d/../e")
+        );
+    }
+
+    #[test]
+    fn test_from() {
+        assert_eq!(
+            rp("foo/bar").to_owned(),
+            RelativePathBuf::from(String::from("foo/bar")),
         );
     }
 

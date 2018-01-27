@@ -52,6 +52,8 @@ use std::path;
 #[cfg(feature = "serde")]
 extern crate serde;
 
+const CURRENT: &str = ".";
+const PARENT: &str = "..";
 const SEP: char = '/';
 const SEP_BYTE: u8 = SEP as u8;
 
@@ -79,6 +81,32 @@ macro_rules! scan_forward {
 
         n
     }}
+}
+
+/// Traverse the given components and apply to the provided stack.
+///
+/// This takes '.', and '..' into account. Where '.' doesn't change the stack, and '..' pops the
+/// last item or further adds parent components.
+#[inline(always)]
+fn relative_traversal<'a, C>(stack: &mut Vec<&'a str>, components: C)
+    where C: IntoIterator<Item = &'a str>
+{
+    for c in components.into_iter() {
+        match c {
+            PARENT => {
+                match stack.last() {
+                    Some(&PARENT) | None => {
+                        stack.push(PARENT);
+                    }
+                    _ => {
+                        stack.pop();
+                    }
+                }
+            },
+            CURRENT => {},
+            c => stack.push(c),
+        }
+    }
 }
 
 /// Iterator over all the components in a relative path.
@@ -169,6 +197,11 @@ impl RelativePathBuf {
     /// Create a new relative path buffer.
     pub fn new() -> RelativePathBuf {
         RelativePathBuf { inner: String::new() }
+    }
+
+    /// Create a new relative path buffer from an owned string.
+    pub fn from_string(path: String) -> RelativePathBuf {
+        RelativePathBuf { inner: path }
     }
 
     /// Extends `self` with `path`.
@@ -373,6 +406,43 @@ impl RelativePath {
                 }
             },
         )
+    }
+
+    /// Return a relative path, resolved from the current path.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    ///
+    /// assert_eq!(
+    ///     RelativePath::new("foo/baz.txt"),
+    ///     RelativePath::new("foo/bar").relativize_with("../baz.txt").as_relative_path()
+    /// );
+    /// ```
+    pub fn relativize_with<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
+        let mut stack = Vec::new();
+        relative_traversal(&mut stack, self.components());
+        relative_traversal(&mut stack, path.as_ref().components());
+        RelativePathBuf::from_string(stack.join("/"))
+    }
+
+    /// Return a relative path, resolved from the current path by removing all relative components.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    ///
+    /// assert_eq!(
+    ///     RelativePath::new("foo/baz.txt"),
+    ///     RelativePath::new("foo/./bar/../baz.txt").relativize().as_relative_path()
+    /// );
+    /// ```
+    pub fn relativize(&self) -> RelativePathBuf {
+        let mut stack = Vec::new();
+        relative_traversal(&mut stack, self.components());
+        RelativePathBuf::from_string(stack.join("/"))
     }
 }
 
@@ -653,6 +723,27 @@ mod tests {
         assert_eq!(
             rp("hello/world/."),
             rp("/hello///world//").to_owned().join(".")
+        );
+    }
+
+    #[test]
+    fn test_relativize() {
+        assert_eq!(
+            rp("c/d"),
+            rp("a/.././b/../c/d").relativize()
+        );
+    }
+
+    #[test]
+    fn test_relativize_with() {
+        assert_eq!(
+            rp("foo/foo/bar"),
+            rp("foo/bar").relativize_with("../foo/bar")
+        );
+
+        assert_eq!(
+            rp("../c/e"),
+            rp("x/y").relativize_with("../../a/b/../../../c/d/../e")
         );
     }
 }

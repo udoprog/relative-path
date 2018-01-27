@@ -319,6 +319,23 @@ impl RelativePath {
         unsafe { mem::transmute(s.as_ref()) }
     }
 
+    /// Returns an object that implements [`Display`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// let path = RelativePath::new("tmp/foo.rs");
+    ///
+    /// println!("{}", path.display());
+    /// ```
+    pub fn display(&self) -> Display {
+        Display {
+            path: self
+        }
+    }
+
     /// Creates an owned [`RelativePathBuf`] with path adjoined to self.
     ///
     /// [`RelativePathBuf`]: struct.RelativePathBuf.html
@@ -516,6 +533,22 @@ impl Hash for RelativePath {
         for c in self.components() {
             c.hash(h);
         }
+    }
+}
+
+pub struct Display<'a> {
+    path: &'a RelativePath,
+}
+
+impl<'a> fmt::Debug for Display<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self.path, f)
+    }
+}
+
+impl<'a> fmt::Display for Display<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.path.inner.fmt(f)
     }
 }
 

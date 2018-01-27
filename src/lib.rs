@@ -243,6 +243,12 @@ impl RelativePathBuf {
     }
 }
 
+impl Default for RelativePathBuf {
+    fn default() -> Self {
+        RelativePathBuf::new()
+    }
+}
+
 impl fmt::Debug for RelativePathBuf {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "{:?}", &self.inner)
@@ -744,6 +750,14 @@ mod tests {
         assert_eq!(
             rp("../c/e"),
             rp("x/y").relativize_with("../../a/b/../../../c/d/../e")
+        );
+    }
+
+    #[test]
+    fn test_default() {
+        assert_eq!(
+            RelativePathBuf::new(),
+            RelativePathBuf::default(),
         );
     }
 }

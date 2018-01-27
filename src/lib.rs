@@ -199,11 +199,6 @@ impl RelativePathBuf {
         RelativePathBuf { inner: String::new() }
     }
 
-    /// Create a new relative path buffer from an owned string.
-    pub fn from(path: String) -> RelativePathBuf {
-        RelativePathBuf { inner: path }
-    }
-
     /// Extends `self` with `path`.
     ///
     /// If `path` is absolute, it replaces the current path.
@@ -267,9 +262,15 @@ impl Borrow<RelativePath> for RelativePathBuf {
     }
 }
 
+impl<'a, T: ?Sized + AsRef<str>> From<&'a T> for RelativePathBuf {
+    fn from(path: &'a T) -> RelativePathBuf {
+        RelativePathBuf { inner: path.as_ref().to_owned() }
+    }
+}
+
 impl From<String> for RelativePathBuf {
-    fn from(value: String) -> RelativePathBuf {
-        RelativePathBuf { inner: value }
+    fn from(path: String) -> RelativePathBuf {
+        RelativePathBuf { inner: path }
     }
 }
 
@@ -758,6 +759,11 @@ mod tests {
         assert_eq!(
             rp("foo/bar").to_owned(),
             RelativePathBuf::from(String::from("foo/bar")),
+        );
+
+        assert_eq!(
+            rp("foo/bar").to_owned(),
+            RelativePathBuf::from("foo/bar"),
         );
     }
 

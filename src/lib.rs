@@ -319,6 +319,19 @@ impl RelativePath {
         unsafe { mem::transmute(s.as_ref()) }
     }
 
+    /// Yields the underlying `str` slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// assert_eq!(RelativePath::new("foo.txt").as_str(), "foo.txt");
+    /// ```
+    pub fn as_str(&self) -> &str {
+        &self.inner
+    }
+
     /// Returns an object that implements [`Display`].
     ///
     /// # Examples

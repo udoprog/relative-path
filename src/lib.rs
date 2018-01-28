@@ -29,11 +29,12 @@ use std::str;
 extern crate serde;
 
 const STEM_SEP: char = '.';
-const CUR: char = '.';
-const CUR_STR: &str = ".";
 const PARENT_STR: &str = "..";
-const SEP: char = '/';
+
+const CUR: char = '.';
 const CUR_BYTE: u8 = CUR as u8;
+
+const SEP: char = '/';
 const SEP_BYTE: u8 = SEP as u8;
 
 #[inline(always)]
@@ -110,7 +111,6 @@ fn iter_after<A, I, J>(mut iter: I, mut prefix: J) -> Option<I>
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Component<'a> {
-    CurDir,
     ParentDir,
     Normal(&'a str),
 }
@@ -133,7 +133,6 @@ impl<'a> Component<'a> {
         use self::Component::*;
 
         match self {
-            CurDir => CUR_STR,
             ParentDir => PARENT_STR,
             Normal(name) => name,
         }
@@ -162,7 +161,6 @@ fn relative_traversal<'a, C>(stack: &mut Vec<Component<'a>>, components: C)
                     }
                 }
             },
-            CurDir => {},
             Normal(name) => stack.push(Normal(name)),
         }
     }
@@ -201,7 +199,6 @@ impl<'a> Iterator for Components<'a> {
         let slice = unsafe { ::std::str::from_utf8_unchecked(slice) };
 
         match slice {
-            "." => Some(Component::CurDir),
             ".." => Some(Component::ParentDir),
             slice => Some(Component::Normal(slice)),
         }
@@ -265,7 +262,6 @@ impl<'a> Components<'a> {
         let w = slice_end - slice_start;
 
         match slice {
-            "." => Some((Component::CurDir, w)),
             ".." => Some((Component::ParentDir, w)),
             slice => Some((Component::Normal(slice), w)),
         }
@@ -733,33 +729,15 @@ impl RelativePath {
     /// assert_eq!(None, RelativePath::new("").parent());
     /// ```
     pub fn parent(&self) -> Option<&RelativePath> {
-        use self::Component::*;
-
-        let mut it = self.components();
-
-        let mut total = 0usize;
-
-        while let Some((c, size)) = it.next_back_component() {
-            match c {
-                CurDir => total += size,
-                ParentDir | Normal(_) => {
-                    total += size;
-                    break;
-                }
-            }
-        }
-
-        if total > 0 {
-            let slice = &self.inner[..self.inner.len() - total];
+        self.components().next_back_component().and_then(|(_, size)| {
+            let slice = &self.inner[..self.inner.len() - size];
 
             if slice.is_empty() {
                 return None;
             }
 
-            return Some(RelativePath::new(slice));
-        }
-
-        None
+            Some(RelativePath::new(slice))
+        })
     }
 
     /// Returns the final component of the `RelativePath`, if there is one.
@@ -785,19 +763,10 @@ impl RelativePath {
     /// assert_eq!(None, RelativePath::new("/").file_name());
     /// ```
     pub fn file_name(&self) -> Option<&str> {
-        use self::Component::*;
-
-        let mut c = self.components();
-
-        while let Some(p) = c.next_back() {
-            match p {
-                Normal(name) => return Some(name),
-                CurDir => continue,
-                _ => return None,
-            }
-        }
-
-        None
+        self.components().next_back().and_then(|c| match c {
+            Component::Normal(name) => Some(name),
+            _ => None,
+        })
     }
 
     /// Returns a relative path that, when joined onto `base`, yields `self`.

@@ -76,7 +76,7 @@ fn split_file_at_dot(input: &str) -> (Option<&str>, Option<&str>) {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Component<'a> {
     CurDir,
     ParentDir,
@@ -84,10 +84,23 @@ pub enum Component<'a> {
 }
 
 impl<'a> Component<'a> {
-    pub fn as_str(&self) -> &'a str {
+    /// Extracts the underlying [`str`] slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// let path = RelativePath::new("./tmp/foo/bar.txt");
+    /// let components: Vec<_> = path.components().map(|comp| comp.as_str()).collect();
+    /// assert_eq!(&components, &[".", "tmp", "foo", "bar.txt"]);
+    /// ```
+    ///
+    /// [`str`]: str
+    pub fn as_str(self) -> &'a str {
         use self::Component::*;
 
-        match *self {
+        match self {
             CurDir => CURRENT,
             ParentDir => PARENT,
             Normal(name) => name,
@@ -212,6 +225,34 @@ impl<'a> cmp::PartialEq for Components<'a> {
     }
 }
 
+/// An iterator over the [`Component`]s of a [`RelativePath`], as [`str`] slices.
+///
+/// This `struct` is created by the [`iter`] method on [`RelativePath`].
+/// See its documentation for more.
+///
+/// [`Component`]: Component
+/// [`iter`]: struct.RelativePath.html#method.iter
+/// [`str`]: str
+/// [`RelativePath`]: struct.RelativePath.html
+#[derive(Clone)]
+pub struct Iter<'a> {
+    inner: Components<'a>,
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<&'a str> {
+        self.inner.next().map(Component::as_str)
+    }
+}
+
+impl<'a> DoubleEndedIterator for Iter<'a> {
+    fn next_back(&mut self) -> Option<&'a str> {
+        self.inner.next_back().map(Component::as_str)
+    }
+}
+
 /// An owned, mutable relative path.
 ///
 /// This type provides methods to manipulate relative path objects.
@@ -254,7 +295,7 @@ impl RelativePathBuf {
             &other.inner[..]
         };
 
-        if self.inner.len() > 0 {
+        if self.inner.len() > 0 && !self.ends_with_sep() {
             self.inner.push(SEP);
         }
 
@@ -263,7 +304,7 @@ impl RelativePathBuf {
 
     /// Updates [`self.file_name`] to `file_name`.
     ///
-    /// If [`self.file_name`] was `None`, this is equivalent to pushing
+    /// If [`self.file_name`] was [`None`], this is equivalent to pushing
     /// `file_name`.
     ///
     /// Otherwise it is equivalent to calling [`pop`] and then pushing
@@ -272,6 +313,7 @@ impl RelativePathBuf {
     ///
     /// [`self.file_name`]: struct.RelativePathBuf.html#method.file_name
     /// [`pop`]: struct.RelativePathBuf.html#method.pop
+    /// [`None`]: std::option::Option
     ///
     /// # Examples
     ///
@@ -307,14 +349,15 @@ impl RelativePathBuf {
 
     /// Updates [`self.extension`] to `extension`.
     ///
-    /// Returns `false` and does nothing if [`self.file_name`] is `None`,
+    /// Returns `false` and does nothing if [`self.file_name`] is [`None`],
     /// returns `true` and updates the extension otherwise.
     ///
-    /// If [`self.extension`] is `None`, the extension is added; otherwise
+    /// If [`self.extension`] is [`None`], the extension is added; otherwise
     /// it is replaced.
     ///
     /// [`self.file_name`]: struct.RelativePathBuf.html#method.file_name
     /// [`self.extension`]: struct.RelativePathBuf.html#method.extension
+    /// [`None`]: std::option::Option
     ///
     /// # Examples
     ///
@@ -360,9 +403,9 @@ impl RelativePathBuf {
     /// Returns `false` and does nothing if [`self.file_name`] is [`None`].
     /// Otherwise, returns `true`.
     ///
-    /// [`None`]: ../../std/option/enum.Option.html#variant.None
-    /// [`self.parent`]: struct.PathBuf.html#method.parent
-    /// [`self.file_name`]: struct.PathBuf.html#method.file_name
+    /// [`self.parent`]: PathBuf::parent
+    /// [`self.file_name`]: PathBuf::file_name
+    /// [`None`]: std::option::Option
     ///
     /// # Examples
     ///
@@ -388,7 +431,7 @@ impl RelativePathBuf {
 
     /// Coerce to a [`RelativePath`] slice.
     ///
-    /// [`RelativePath`]: struct.RelativePath.html
+    /// [`RelativePath`]: RelativePath
     pub fn as_relative_path(&self) -> &RelativePath {
         self
     }
@@ -397,6 +440,20 @@ impl RelativePathBuf {
 impl Default for RelativePathBuf {
     fn default() -> Self {
         RelativePathBuf::new()
+    }
+}
+
+impl<'a> From<&'a RelativePath> for Cow<'a, RelativePath> {
+    #[inline]
+    fn from(s: &'a RelativePath) -> Cow<'a, RelativePath> {
+        Cow::Borrowed(s)
+    }
+}
+
+impl<'a> From<RelativePathBuf> for Cow<'a, RelativePath> {
+    #[inline]
+    fn from(s: RelativePathBuf) -> Cow<'a, RelativePath> {
+        Cow::Owned(s)
     }
 }
 
@@ -475,9 +532,9 @@ impl RelativePath {
         unsafe { &*(s.as_ref() as *const str as *const RelativePath) }
     }
 
-    // The following (private!) function reveals the byte encoding used for OsStr.
+    // The following (private!) function reveals the byte encoding used for str.
     fn as_u8_slice(&self) -> &[u8] {
-        unsafe { &*(&self.inner as *const str as *const [u8]) }
+        self.inner.as_bytes()
     }
 
     /// Yields the underlying `str` slice.
@@ -512,7 +569,7 @@ impl RelativePath {
 
     /// Creates an owned [`RelativePathBuf`] with path adjoined to self.
     ///
-    /// [`RelativePathBuf`]: struct.RelativePathBuf.html
+    /// [`RelativePathBuf`]: RelativePathBuf
     ///
     /// # Examples
     ///
@@ -547,9 +604,32 @@ impl RelativePath {
         Components::new(&self.inner)
     }
 
+    /// Produces an iterator over the path's components viewed as [`str`]
+    /// slices.
+    ///
+    /// For more information about the particulars of how the path is separated
+    /// into components, see [`components`].
+    ///
+    /// [`components`]: #method.components
+    /// [`str`]: str
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// let mut it = RelativePath::new("/tmp/foo.txt").iter();
+    /// assert_eq!(it.next(), Some("tmp"));
+    /// assert_eq!(it.next(), Some("foo.txt"));
+    /// assert_eq!(it.next(), None)
+    /// ```
+    pub fn iter(&self) -> Iter {
+        Iter { inner: self.components() }
+    }
+
     /// Convert to an owned [`RelativePathBuf`].
     ///
-    /// [`RelativePathBuf`]: struct.RelativePathBuf.html
+    /// [`RelativePathBuf`]: RelativePathBuf
     pub fn to_relative_path_buf(&self) -> RelativePathBuf {
         RelativePathBuf::from(self.inner.to_string())
     }
@@ -583,17 +663,33 @@ impl RelativePath {
     /// assert_eq!(None, RelativePath::new("").parent());
     /// ```
     pub fn parent(&self) -> Option<&RelativePath> {
-        self.components().next_back_component().and_then(
-            |(_, size)| {
-                let slice = &self.inner[..self.inner.len() - size];
+        use self::Component::*;
 
-                if slice.is_empty() {
-                    return None;
+        let mut it = self.components();
+
+        let mut total = 0usize;
+
+        while let Some((c, size)) = it.next_back_component() {
+            match c {
+                CurDir => total += size,
+                ParentDir | Normal(_) => {
+                    total += size;
+                    break;
                 }
+            }
+        }
 
-                Some(RelativePath::new(slice))
-            },
-        )
+        if total > 0 {
+            let slice = &self.inner[..self.inner.len() - total];
+
+            if slice.is_empty() {
+                return None;
+            }
+
+            return Some(RelativePath::new(slice));
+        }
+
+        None
     }
 
     /// Returns the final component of the `RelativePath`, if there is one.
@@ -601,7 +697,9 @@ impl RelativePath {
     /// If the path is a normal file, this is the file name. If it's the path of a directory, this
     /// is the directory name.
     ///
-    /// Returns `None` If the path terminates in `..`.
+    /// Returns [`None`] If the path terminates in `..`.
+    ///
+    /// [`None`]: std::option::Option
     ///
     /// # Examples
     ///
@@ -636,7 +734,7 @@ impl RelativePath {
     ///
     /// See [`RelativePathBuf::set_file_name`] for more details.
     ///
-    /// [`RelativePathBuf`]: struct.RelativePathBuf.html
+    /// [`RelativePathBuf`]: RelativePathBuf
     /// [`RelativePathBuf::set_file_name`]: struct.RelativePathBuf.html#method.set_file_name
     ///
     /// # Examples
@@ -662,10 +760,12 @@ impl RelativePath {
     ///
     /// The stem is:
     ///
-    /// * `None`, if there is no file name;
+    /// * [`None`], if there is no file name;
     /// * The entire file name if there is no embedded `.`;
     /// * The entire file name if the file name begins with `.` and has no other `.`s within;
     /// * Otherwise, the portion of the file name before the final `.`
+    ///
+    /// [`None`]: std::option::Option
     ///
     /// # Examples
     ///
@@ -684,13 +784,13 @@ impl RelativePath {
     ///
     /// The extension is:
     ///
-    /// * `None`, if there is no file name;
-    /// * `None`, if there is no embedded `.`;
-    /// * `None`, if the file name begins with `.` and has no other `.`s within;
+    /// * [`None`], if there is no file name;
+    /// * [`None`], if there is no embedded `.`;
+    /// * [`None`], if the file name begins with `.` and has no other `.`s within;
     /// * Otherwise, the portion of the file name after the final `.`
     ///
     /// [`self.file_name`]: struct.RelativePath.html#method.file_name
-    /// [`None`]: ../../std/option/enum.Option.html#variant.None
+    /// [`None`]: std::option::Option
     ///
     /// # Examples
     ///
@@ -709,7 +809,7 @@ impl RelativePath {
     ///
     /// See [`RelativePathBuf::set_extension`] for more details.
     ///
-    /// [`RelativePathBuf`]: struct.RelativePathBuf.html
+    /// [`RelativePathBuf`]: RelativePathBuf
     /// [`RelativePathBuf::set_extension`]: struct.RelativePathBuf.html#method.set_extension
     ///
     /// # Examples
@@ -754,6 +854,14 @@ impl RelativePath {
     /// Return an owned `RelativePathBuf`, with all relative (current dir, parent dir) components
     /// either removed or moved to the beginning of the path.
     ///
+    /// Normalization is a _destructive_ operation if the path references an actual filesystem
+    /// path.
+    /// An example of this is symlinks under unix, a path like `foo/../bar` might reference a
+    /// different location other than `./bar`.
+    ///
+    /// Normalization is a logical operation that is only valid if the relative path is part of
+    /// some context which doesn't have semantics that causes it to break, like symbolic links.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -773,7 +881,12 @@ impl RelativePath {
 
     /// Check if path starts with a path separator.
     fn starts_with_sep(&self) -> bool {
-        self.inner.chars().next() == Some(SEP)
+        self.inner.starts_with(SEP)
+    }
+
+    /// Check if path ends with a path separator.
+    fn ends_with_sep(&self) -> bool {
+        self.inner.ends_with(SEP)
     }
 }
 
@@ -843,6 +956,14 @@ impl Hash for RelativePath {
     }
 }
 
+/// Helper struct for printing relative paths.
+///
+/// This is not strictly necessary in the same sense as it is for [`std::path::Display`], because
+/// relative paths are guaranteed to be valid unicode. But the behavior is preserved to simplify
+/// the transition between [`std::path::Path`] and [`RelativePath`].
+///
+/// [`std::path::Display`]: std::path::Display
+/// [`RelativePath`]: RelativePath
 pub struct Display<'a> {
     path: &'a RelativePath,
 }
@@ -997,6 +1118,70 @@ mod tests {
     use std::path::Path;
     use super::*;
 
+    macro_rules! t(
+        ($path:expr, iter: $iter:expr) => (
+            {
+                let path = RelativePath::new($path);
+
+                // Forward iteration
+                let comps = path.iter().map(str::to_string).collect::<Vec<String>>();
+                let exp: &[&str] = &$iter;
+                let exps = exp.iter().map(|s| s.to_string()).collect::<Vec<String>>();
+                assert!(comps == exps, "iter: Expected {:?}, found {:?}",
+                        exps, comps);
+
+                // Reverse iteration
+                let comps = RelativePath::new($path).iter().rev().map(str::to_string)
+                    .collect::<Vec<String>>();
+                let exps = exps.into_iter().rev().collect::<Vec<String>>();
+                assert!(comps == exps, "iter().rev(): Expected {:?}, found {:?}",
+                        exps, comps);
+            }
+        );
+
+        ($path:expr, parent: $parent:expr, file_name: $file:expr) => (
+            {
+                let path = RelativePath::new($path);
+
+                let parent = path.parent().map(|p| p.as_str());
+                let exp_parent: Option<&str> = $parent;
+                assert!(parent == exp_parent, "parent: Expected {:?}, found {:?}",
+                        exp_parent, parent);
+
+                let file = path.file_name();
+                let exp_file: Option<&str> = $file;
+                assert!(file == exp_file, "file_name: Expected {:?}, found {:?}",
+                        exp_file, file);
+            }
+        );
+
+        ($path:expr, file_stem: $file_stem:expr, extension: $extension:expr) => (
+            {
+                let path = RelativePath::new($path);
+
+                let stem = path.file_stem();
+                let exp_stem: Option<&str> = $file_stem;
+                assert!(stem == exp_stem, "file_stem: Expected {:?}, found {:?}",
+                        exp_stem, stem);
+
+                let ext = path.extension();
+                let exp_ext: Option<&str> = $extension;
+                assert!(ext == exp_ext, "extension: Expected {:?}, found {:?}",
+                        exp_ext, ext);
+            }
+        );
+
+        ($path:expr, iter: $iter:expr,
+                     parent: $parent:expr, file_name: $file:expr,
+                     file_stem: $file_stem:expr, extension: $extension:expr) => (
+            {
+                t!($path, iter: $iter);
+                t!($path, parent: $parent, file_name: $file);
+                t!($path, file_stem: $file_stem, extension: $extension);
+            }
+        );
+    );
+
     fn assert_components(components: &[&str], path: &RelativePath) {
         let components = components.iter().cloned().map(Component::Normal).collect::<Vec<_>>();
         let result: Vec<_> = path.components().collect();
@@ -1006,6 +1191,465 @@ mod tests {
     fn rp(input: &str) -> &RelativePath {
         RelativePath::new(input)
     }
+
+    #[test]
+    pub fn test_decompositions() {
+        t!("",
+           iter: [],
+           parent: None,
+           file_name: None,
+           file_stem: None,
+           extension: None
+           );
+
+        t!("foo",
+           iter: ["foo"],
+           parent: None,
+           file_name: Some("foo"),
+           file_stem: Some("foo"),
+           extension: None
+           );
+
+        t!("/",
+           iter: [],
+           parent: None,
+           file_name: None,
+           file_stem: None,
+           extension: None
+           );
+
+        t!("/foo",
+           iter: ["foo"],
+           parent: None,
+           file_name: Some("foo"),
+           file_stem: Some("foo"),
+           extension: None
+           );
+
+        t!("foo/",
+           iter: ["foo"],
+           parent: None,
+           file_name: Some("foo"),
+           file_stem: Some("foo"),
+           extension: None
+           );
+
+        t!("/foo/",
+           iter: ["foo"],
+           parent: None,
+           file_name: Some("foo"),
+           file_stem: Some("foo"),
+           extension: None
+           );
+
+        t!("foo/bar",
+           iter: ["foo", "bar"],
+           parent: Some("foo"),
+           file_name: Some("bar"),
+           file_stem: Some("bar"),
+           extension: None
+           );
+
+        t!("/foo/bar",
+           iter: ["foo", "bar"],
+           parent: Some("/foo"),
+           file_name: Some("bar"),
+           file_stem: Some("bar"),
+           extension: None
+           );
+
+        t!("///foo///",
+           iter: ["foo"],
+           parent: None,
+           file_name: Some("foo"),
+           file_stem: Some("foo"),
+           extension: None
+           );
+
+        t!("///foo///bar",
+           iter: ["foo", "bar"],
+           parent: Some("///foo"),
+           file_name: Some("bar"),
+           file_stem: Some("bar"),
+           extension: None
+           );
+
+        t!("./.",
+           iter: [".", "."],
+           parent: None,
+           file_name: None,
+           file_stem: None,
+           extension: None
+           );
+
+        t!("/..",
+           iter: [".."],
+           parent: None,
+           file_name: None,
+           file_stem: None,
+           extension: None
+           );
+
+        t!("../",
+           iter: [".."],
+           parent: None,
+           file_name: None,
+           file_stem: None,
+           extension: None
+           );
+
+        t!("foo/.",
+           iter: ["foo", "."],
+           parent: None,
+           file_name: Some("foo"),
+           file_stem: Some("foo"),
+           extension: None
+           );
+
+        t!("foo/..",
+           iter: ["foo", ".."],
+           parent: Some("foo"),
+           file_name: None,
+           file_stem: None,
+           extension: None
+           );
+
+        t!("foo/./",
+           iter: ["foo", "."],
+           parent: None,
+           file_name: Some("foo"),
+           file_stem: Some("foo"),
+           extension: None
+           );
+
+        t!("foo/./bar",
+           iter: ["foo", ".", "bar"],
+           parent: Some("foo/."),
+           file_name: Some("bar"),
+           file_stem: Some("bar"),
+           extension: None
+           );
+
+        t!("foo/../",
+           iter: ["foo", ".."],
+           parent: Some("foo"),
+           file_name: None,
+           file_stem: None,
+           extension: None
+           );
+
+        t!("foo/../bar",
+           iter: ["foo", "..", "bar"],
+           parent: Some("foo/.."),
+           file_name: Some("bar"),
+           file_stem: Some("bar"),
+           extension: None
+           );
+
+        t!("./a",
+           iter: [".", "a"],
+           parent: Some("."),
+           file_name: Some("a"),
+           file_stem: Some("a"),
+           extension: None
+           );
+
+        t!(".",
+           iter: ["."],
+           parent: None,
+           file_name: None,
+           file_stem: None,
+           extension: None
+           );
+
+        t!("./",
+           iter: ["."],
+           parent: None,
+           file_name: None,
+           file_stem: None,
+           extension: None
+           );
+
+        t!("a/b",
+           iter: ["a", "b"],
+           parent: Some("a"),
+           file_name: Some("b"),
+           file_stem: Some("b"),
+           extension: None
+           );
+
+        t!("a//b",
+           iter: ["a", "b"],
+           parent: Some("a"),
+           file_name: Some("b"),
+           file_stem: Some("b"),
+           extension: None
+           );
+
+        t!("a/./b",
+           iter: ["a", ".", "b"],
+           parent: Some("a/."),
+           file_name: Some("b"),
+           file_stem: Some("b"),
+           extension: None
+           );
+
+        t!("a/b/c",
+           iter: ["a", "b", "c"],
+           parent: Some("a/b"),
+           file_name: Some("c"),
+           file_stem: Some("c"),
+           extension: None
+           );
+
+        t!(".foo",
+           iter: [".foo"],
+           parent: None,
+           file_name: Some(".foo"),
+           file_stem: Some(".foo"),
+           extension: None
+           );
+    }
+
+    #[test]
+    pub fn test_stem_ext() {
+        t!("foo",
+           file_stem: Some("foo"),
+           extension: None
+           );
+
+        t!("foo.",
+           file_stem: Some("foo"),
+           extension: Some("")
+           );
+
+        t!(".foo",
+           file_stem: Some(".foo"),
+           extension: None
+           );
+
+        t!("foo.txt",
+           file_stem: Some("foo"),
+           extension: Some("txt")
+           );
+
+        t!("foo.bar.txt",
+           file_stem: Some("foo.bar"),
+           extension: Some("txt")
+           );
+
+        t!("foo.bar.",
+           file_stem: Some("foo.bar"),
+           extension: Some("")
+           );
+
+        t!(".",
+           file_stem: None,
+           extension: None
+           );
+
+        t!("..",
+           file_stem: None,
+           extension: None
+           );
+
+        t!("",
+           file_stem: None,
+           extension: None
+           );
+    }
+
+
+    #[test]
+    pub fn test_set_file_name() {
+        macro_rules! tfn(
+                ($path:expr, $file:expr, $expected:expr) => ( {
+                let mut p = RelativePathBuf::from($path);
+                p.set_file_name($file);
+                assert!(p.as_str() == $expected,
+                        "setting file name of {:?} to {:?}: Expected {:?}, got {:?}",
+                        $path, $file, $expected,
+                        p.as_str());
+            });
+        );
+
+        tfn!("foo", "foo", "foo");
+        tfn!("foo", "bar", "bar");
+        tfn!("foo", "", "");
+        tfn!("", "foo", "foo");
+
+        tfn!(".", "foo", "./foo");
+        tfn!("foo/", "bar", "bar");
+        tfn!("foo/.", "bar", "bar");
+        tfn!("..", "foo", "../foo");
+        tfn!("foo/..", "bar", "foo/../bar");
+        tfn!("/", "foo", "/foo");
+    }
+
+    #[test]
+    pub fn test_set_extension() {
+        macro_rules! tse(
+                ($path:expr, $ext:expr, $expected:expr, $output:expr) => ( {
+                let mut p = RelativePathBuf::from($path);
+                let output = p.set_extension($ext);
+                assert!(p.as_str() == $expected && output == $output,
+                        "setting extension of {:?} to {:?}: Expected {:?}/{:?}, got {:?}/{:?}",
+                        $path, $ext, $expected, $output,
+                        p.as_str(), output);
+            });
+        );
+
+        tse!("foo", "txt", "foo.txt", true);
+        tse!("foo.bar", "txt", "foo.txt", true);
+        tse!("foo.bar.baz", "txt", "foo.bar.txt", true);
+        tse!(".test", "txt", ".test.txt", true);
+        tse!("foo.txt", "", "foo", true);
+        tse!("foo", "", "foo", true);
+        tse!("", "foo", "", false);
+        tse!(".", "foo", ".", false);
+        tse!("foo/", "bar", "foo.bar", true);
+        tse!("foo/.", "bar", "foo.bar", true);
+        tse!("..", "foo", "..", false);
+        tse!("foo/..", "bar", "foo/..", false);
+        tse!("/", "foo", "/", false);
+    }
+
+    #[test]
+    fn test_eq_recievers() {
+        use std::borrow::Cow;
+
+        let borrowed: &RelativePath = RelativePath::new("foo/bar");
+        let mut owned: RelativePathBuf = RelativePathBuf::new();
+        owned.push("foo");
+        owned.push("bar");
+        let borrowed_cow: Cow<RelativePath> = borrowed.into();
+        let owned_cow: Cow<RelativePath> = owned.clone().into();
+
+        macro_rules! t {
+            ($($current:expr),+) => {
+                $(
+                    assert_eq!($current, borrowed);
+                    assert_eq!($current, owned);
+                    assert_eq!($current, borrowed_cow);
+                    assert_eq!($current, owned_cow);
+                )+
+            }
+        }
+
+        t!(borrowed, owned, borrowed_cow, owned_cow);
+    }
+
+    // TODO: fixme
+    /*
+    #[test]
+    pub fn test_compare() {
+        use std::hash::{Hash, Hasher};
+        use std::collections::hash_map::DefaultHasher;
+
+        fn hash<T: Hash>(t: T) -> u64 {
+            let mut s = DefaultHasher::new();
+            t.hash(&mut s);
+            s.finish()
+        }
+
+        macro_rules! tc(
+            ($path1:expr, $path2:expr, eq: $eq:expr,
+             starts_with: $starts_with:expr, ends_with: $ends_with:expr,
+             relative_from: $relative_from:expr) => ({
+                 let path1 = RelativePath::new($path1);
+                 let path2 = RelativePath::new($path2);
+
+                 let eq = path1 == path2;
+                 assert!(eq == $eq, "{:?} == {:?}, expected {:?}, got {:?}",
+                         $path1, $path2, $eq, eq);
+                 assert!($eq == (hash(path1) == hash(path2)),
+                         "{:?} == {:?}, expected {:?}, got {} and {}",
+                         $path1, $path2, $eq, hash(path1), hash(path2));
+
+                 let starts_with = path1.starts_with(path2);
+                 assert!(starts_with == $starts_with,
+                         "{:?}.starts_with({:?}), expected {:?}, got {:?}", $path1, $path2,
+                         $starts_with, starts_with);
+
+                 let ends_with = path1.ends_with(path2);
+                 assert!(ends_with == $ends_with,
+                         "{:?}.ends_with({:?}), expected {:?}, got {:?}", $path1, $path2,
+                         $ends_with, ends_with);
+
+                 let relative_from = path1.strip_prefix(path2)
+                                          .map(|p| p.to_str().unwrap())
+                                          .ok();
+                 let exp: Option<&str> = $relative_from;
+                 assert!(relative_from == exp,
+                         "{:?}.strip_prefix({:?}), expected {:?}, got {:?}",
+                         $path1, $path2, exp, relative_from);
+            });
+        );
+
+        tc!("", "",
+            eq: true,
+            starts_with: true,
+            ends_with: true,
+            relative_from: Some("")
+            );
+
+        tc!("foo", "",
+            eq: false,
+            starts_with: true,
+            ends_with: true,
+            relative_from: Some("foo")
+            );
+
+        tc!("", "foo",
+            eq: false,
+            starts_with: false,
+            ends_with: false,
+            relative_from: None
+            );
+
+        tc!("foo", "foo",
+            eq: true,
+            starts_with: true,
+            ends_with: true,
+            relative_from: Some("")
+            );
+
+        tc!("foo/", "foo",
+            eq: true,
+            starts_with: true,
+            ends_with: true,
+            relative_from: Some("")
+            );
+
+        tc!("foo/bar", "foo",
+            eq: false,
+            starts_with: true,
+            ends_with: false,
+            relative_from: Some("bar")
+            );
+
+        tc!("foo/bar/baz", "foo/bar",
+            eq: false,
+            starts_with: true,
+            ends_with: false,
+            relative_from: Some("baz")
+            );
+
+        tc!("foo/bar", "foo/bar/baz",
+            eq: false,
+            starts_with: false,
+            ends_with: false,
+            relative_from: None
+            );
+
+        tc!("./foo/bar/", ".",
+            eq: false,
+            starts_with: true,
+            ends_with: false,
+            relative_from: Some("foo/bar")
+            );
+    }
+    */
 
     #[test]
     fn test_join() {
@@ -1112,5 +1756,53 @@ mod tests {
             RelativePathBuf::new(),
             RelativePathBuf::default(),
         );
+    }
+
+    #[test]
+    pub fn test_push() {
+        macro_rules! tp(
+            ($path:expr, $push:expr, $expected:expr) => ( {
+                let mut actual = RelativePathBuf::from($path);
+                actual.push($push);
+                assert!(actual.as_str() == $expected,
+                        "pushing {:?} onto {:?}: Expected {:?}, got {:?}",
+                        $push, $path, $expected, actual.as_str());
+            });
+        );
+
+        tp!("", "foo", "foo");
+        tp!("foo", "bar", "foo/bar");
+        tp!("foo/", "bar", "foo/bar");
+        tp!("foo//", "bar", "foo//bar");
+        tp!("foo/.", "bar", "foo/./bar");
+        tp!("foo./.", "bar", "foo././bar");
+        tp!("foo", "", "foo/");
+        tp!("foo", ".", "foo/.");
+        tp!("foo", "..", "foo/..");
+    }
+
+    #[test]
+    pub fn test_pop() {
+        macro_rules! tp(
+            ($path:expr, $expected:expr, $output:expr) => ( {
+                let mut actual = RelativePathBuf::from($path);
+                let output = actual.pop();
+                assert!(actual.as_str() == $expected && output == $output,
+                        "popping from {:?}: Expected {:?}/{:?}, got {:?}/{:?}",
+                        $path, $expected, $output,
+                        actual.as_str(), output);
+            });
+        );
+
+        tp!("", "", false);
+        tp!("/", "/", false);
+        tp!("foo", "foo", false);
+        tp!(".", ".", false);
+        tp!("/foo", "/foo", false);
+        tp!("/foo/bar", "/foo", true);
+        tp!("/foo/bar/.", "/foo", true);
+        tp!("foo/bar", "foo", true);
+        tp!("foo/.", "foo/.", false);
+        tp!("foo//bar", "foo", true);
     }
 }

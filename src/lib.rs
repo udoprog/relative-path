@@ -726,7 +726,7 @@ impl RelativePath {
         buf
     }
 
-    /// Return a relative path, resolved from the current path.
+    /// Build an owned `RelativePathBuf`, joined with the given path and normalized.
     ///
     /// # Examples
     ///
@@ -735,10 +735,15 @@ impl RelativePath {
     ///
     /// assert_eq!(
     ///     RelativePath::new("foo/baz.txt"),
-    ///     RelativePath::new("foo/bar").relativize_with("../baz.txt").as_relative_path()
+    ///     RelativePath::new("foo/bar").join_normalized("../baz.txt").as_relative_path()
+    /// );
+    ///
+    /// assert_eq!(
+    ///     RelativePath::new("../foo/baz.txt"),
+    ///     RelativePath::new("../foo/bar").join_normalized("../baz.txt").as_relative_path()
     /// );
     /// ```
-    pub fn relativize_with<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
+    pub fn join_normalized<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
         let mut stack = Vec::new();
         relative_traversal(&mut stack, self.components());
         relative_traversal(&mut stack, path.as_ref().components());
@@ -746,7 +751,8 @@ impl RelativePath {
         RelativePathBuf::from(string)
     }
 
-    /// Return a relative path, resolved from the current path by removing all relative components.
+    /// Return an owned `RelativePathBuf`, with all relative (current dir, parent dir) components
+    /// either removed or moved to the beginning of the path.
     ///
     /// # Examples
     ///
@@ -754,11 +760,11 @@ impl RelativePath {
     /// use relative_path::RelativePath;
     ///
     /// assert_eq!(
-    ///     RelativePath::new("foo/baz.txt"),
-    ///     RelativePath::new("foo/./bar/../baz.txt").relativize().as_relative_path()
+    ///     RelativePath::new("../foo/baz.txt"),
+    ///     RelativePath::new("../foo/./bar/../baz.txt").normalize().as_relative_path()
     /// );
     /// ```
-    pub fn relativize(&self) -> RelativePathBuf {
+    pub fn normalize(&self) -> RelativePathBuf {
         let mut stack = Vec::new();
         relative_traversal(&mut stack, self.components());
         let string = stack.into_iter().map(|c| c.as_str()).collect::<Vec<_>>().join("/");
@@ -1067,23 +1073,23 @@ mod tests {
     }
 
     #[test]
-    fn test_relativize() {
+    fn test_normalize() {
         assert_eq!(
             rp("c/d"),
-            rp("a/.././b/../c/d").relativize()
+            rp("a/.././b/../c/d").normalize()
         );
     }
 
     #[test]
-    fn test_relativize_with() {
+    fn test_relative_to() {
         assert_eq!(
             rp("foo/foo/bar"),
-            rp("foo/bar").relativize_with("../foo/bar")
+            rp("foo/bar").join_normalized("../foo/bar")
         );
 
         assert_eq!(
             rp("../c/e"),
-            rp("x/y").relativize_with("../../a/b/../../../c/d/../e")
+            rp("x/y").join_normalized("../../a/b/../../../c/d/../e")
         );
     }
 

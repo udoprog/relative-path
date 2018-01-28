@@ -29,39 +29,49 @@ use std::str;
 extern crate serde;
 
 const STEM_SEP: char = '.';
-const CURRENT: &str = ".";
-const PARENT: &str = "..";
+const CUR: char = '.';
+const CUR_STR: &str = ".";
+const PARENT_STR: &str = "..";
 const SEP: char = '/';
+const CUR_BYTE: u8 = CUR as u8;
 const SEP_BYTE: u8 = SEP as u8;
 
-/// Scan backwards until the given separator has been encountered using the provided `cmp`.
-macro_rules! scan_back {
-    ($source:expr, $init:expr, $cmp:tt, $sep:expr) => {{
-        let mut n = $init;
-
-        while n > 0 && $source[n - 1] $cmp $sep {
-            n -= 1;
+#[inline(always)]
+fn scan_back<P>(mut n: usize, source: &[u8], pattern: P) -> usize
+    where P: Fn(u8, Option<u8>) -> bool
+{
+    while n > 0 {
+        if !pattern(source[n - 1], if n > 1 { Some(source[n - 2]) } else { None }) {
+            break;
         }
 
-        n
-    }}
+        n -= 1;
+    }
+
+    n
 }
 
-/// Scan forward until the given separator has been encountered using the provided `cmp`.
-macro_rules! scan_forward {
-    ($source:expr, $init:expr, $cmp:tt, $sep:expr) => {{
-        let mut n = $init;
-
-        while n < $source.len() && $source[n] $cmp $sep {
-            n += 1;
+#[inline(always)]
+fn scan_forward<P>(mut n: usize, source: &[u8], pattern: P) -> usize
+    where P: Fn(u8, Option<u8>) -> bool
+{
+    while n < source.len() {
+        if !pattern(source[n], if n + 1 < source.len() { Some(source[n + 1]) } else { None }) {
+            break;
         }
 
-        n
-    }}
+        n += 1;
+    }
+
+    n
+}
+
+fn scan_separator(a: u8, b: Option<u8>) -> bool {
+    a == SEP_BYTE || a == CUR_BYTE && b.map(|c| c == SEP_BYTE).unwrap_or(true)
 }
 
 fn split_file_at_dot(input: &str) -> (Option<&str>, Option<&str>) {
-    if input == PARENT {
+    if input == PARENT_STR {
         return (Some(input), None);
     }
 
@@ -115,7 +125,7 @@ impl<'a> Component<'a> {
     ///
     /// let path = RelativePath::new("./tmp/foo/bar.txt");
     /// let components: Vec<_> = path.components().map(|comp| comp.as_str()).collect();
-    /// assert_eq!(&components, &[".", "tmp", "foo", "bar.txt"]);
+    /// assert_eq!(&components, &["tmp", "foo", "bar.txt"]);
     /// ```
     ///
     /// [`str`]: str
@@ -123,8 +133,8 @@ impl<'a> Component<'a> {
         use self::Component::*;
 
         match self {
-            CurDir => CURRENT,
-            ParentDir => PARENT,
+            CurDir => CUR_STR,
+            ParentDir => PARENT_STR,
             Normal(name) => name,
         }
     }
@@ -173,11 +183,13 @@ impl<'a> Iterator for Components<'a> {
         }
 
         // strip prefixing separators
-        let start = scan_forward!(self.source, 0usize, ==, SEP_BYTE);
+        let start = scan_forward(0usize, self.source, scan_separator);
+
         // collect component
-        let end = scan_forward!(self.source, start, !=, SEP_BYTE);
+        let end = scan_forward(start, self.source, |a, _| a != SEP_BYTE);
+
         // strip suffixing separator
-        let slice_end = scan_forward!(self.source, end, ==, SEP_BYTE);
+        let slice_end = scan_forward(end, self.source, scan_separator);
 
         let slice = &self.source[start..end];
         self.source = &self.source[slice_end..];
@@ -233,11 +245,13 @@ impl<'a> Components<'a> {
         let slice_end = self.source.len();
 
         // strip suffixing separators
-        let end = scan_back!(self.source, slice_end, ==, SEP_BYTE);
+        let end = scan_back(slice_end, self.source, scan_separator);
+
         // find component
-        let start = scan_back!(self.source, end, !=, SEP_BYTE);
+        let start = scan_back(end, self.source, |a, _| a != SEP_BYTE);
+
         // strip prefixing separator
-        let slice_start = scan_back!(self.source, start, ==, SEP_BYTE);
+        let slice_start = scan_back(start, self.source, scan_separator);
 
         let slice = &self.source[start..end];
         self.source = &self.source[..slice_start];
@@ -1396,7 +1410,7 @@ mod tests {
            );
 
         t!("./.",
-           iter: [".", "."],
+           iter: [],
            parent: None,
            file_name: None,
            file_stem: None,
@@ -1420,7 +1434,7 @@ mod tests {
            );
 
         t!("foo/.",
-           iter: ["foo", "."],
+           iter: ["foo"],
            parent: None,
            file_name: Some("foo"),
            file_stem: Some("foo"),
@@ -1436,7 +1450,7 @@ mod tests {
            );
 
         t!("foo/./",
-           iter: ["foo", "."],
+           iter: ["foo"],
            parent: None,
            file_name: Some("foo"),
            file_stem: Some("foo"),
@@ -1444,8 +1458,8 @@ mod tests {
            );
 
         t!("foo/./bar",
-           iter: ["foo", ".", "bar"],
-           parent: Some("foo/."),
+           iter: ["foo", "bar"],
+           parent: Some("foo"),
            file_name: Some("bar"),
            file_stem: Some("bar"),
            extension: None
@@ -1468,15 +1482,15 @@ mod tests {
            );
 
         t!("./a",
-           iter: [".", "a"],
-           parent: Some("."),
+           iter: ["a"],
+           parent: None,
            file_name: Some("a"),
            file_stem: Some("a"),
            extension: None
            );
 
         t!(".",
-           iter: ["."],
+           iter: [],
            parent: None,
            file_name: None,
            file_stem: None,
@@ -1484,7 +1498,7 @@ mod tests {
            );
 
         t!("./",
-           iter: ["."],
+           iter: [],
            parent: None,
            file_name: None,
            file_stem: None,
@@ -1508,8 +1522,8 @@ mod tests {
            );
 
         t!("a/./b",
-           iter: ["a", ".", "b"],
-           parent: Some("a/."),
+           iter: ["a", "b"],
+           parent: Some("a"),
            file_name: Some("b"),
            file_stem: Some("b"),
            extension: None
@@ -1811,7 +1825,8 @@ mod tests {
 
     #[test]
     fn test_parent() {
-        let path = rp("baz//bar/foo//");
+        let path = rp("baz/./bar/foo//./.");
+
         assert_eq!(Some(rp("baz/bar")), path.parent());
         assert_eq!(Some(rp("baz")), path.parent().and_then(RelativePath::parent));
         assert_eq!(None,

@@ -23,6 +23,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::{self, Deref};
 use std::path;
+use std::str;
 
 #[cfg(feature = "serde")]
 extern crate serde;
@@ -73,6 +74,27 @@ fn split_file_at_dot(input: &str) -> (Option<&str>, Option<&str>) {
         (Some(input), None)
     } else {
         (before, after)
+    }
+}
+
+// Iterate through `iter` while it matches `prefix`; return `None` if `prefix`
+// is not a prefix of `iter`, otherwise return `Some(iter_after_prefix)` giving
+// `iter` after having exhausted `prefix`.
+fn iter_after<A, I, J>(mut iter: I, mut prefix: J) -> Option<I>
+    where I: Iterator<Item = A> + Clone,
+          J: Iterator<Item = A>,
+          A: PartialEq
+{
+    loop {
+        let mut iter_next = iter.clone();
+        match (iter_next.next(), prefix.next()) {
+            (Some(ref x), Some(ref y)) if x == y => (),
+            (Some(_), Some(_)) => return None,
+            (Some(_), None) => return Some(iter),
+            (None, None) => return Some(iter),
+            (None, Some(_)) => return None,
+        }
+        iter = iter_next;
     }
 }
 
@@ -183,6 +205,23 @@ impl<'a> DoubleEndedIterator for Components<'a> {
 impl<'a> Components<'a> {
     pub fn new(input: &str) -> Components {
         Components { source: input.as_bytes() }
+    }
+
+    /// Extracts a slice corresponding to the portion of the path remaining for iteration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// let mut components = RelativePath::new("tmp/foo/bar.txt").components();
+    /// components.next();
+    /// components.next();
+    ///
+    /// assert_eq!(RelativePath::new("bar.txt"), components.as_relative_path());
+    /// ```
+    pub fn as_relative_path(&self) -> &'a RelativePath {
+        unsafe { RelativePath::from_u8_slice(self.source) }
     }
 
     /// Extracts the next back component and its length including separators.
@@ -526,10 +565,27 @@ pub struct RelativePath {
     inner: str,
 }
 
+/// An error returned from [`RelativePath::strip_prefix`][`strip_prefix`] if the prefix
+/// was not found.
+///
+/// This `struct` is created by the [`strip_prefix`] method on [`RelativePath`].
+/// See its documentation for more.
+///
+/// [`strip_prefix`]: struct.RelativePath.html#method.strip_prefix
+/// [`RelativePath`]: RelativePath
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StripPrefixError(());
+
 impl RelativePath {
     /// Directly wraps a string slice as a `RelativePath` slice.
     pub fn new<S: AsRef<str> + ?Sized>(s: &S) -> &RelativePath {
         unsafe { &*(s.as_ref() as *const str as *const RelativePath) }
+    }
+
+    // The following (private!) function allows construction of a path from a u8
+    // slice, which is only safe when it is known to follow the str encoding.
+    unsafe fn from_u8_slice(s: &[u8]) -> &RelativePath {
+        RelativePath::new(str::from_utf8_unchecked(s))
     }
 
     // The following (private!) function reveals the byte encoding used for str.
@@ -728,6 +784,71 @@ impl RelativePath {
         }
 
         None
+    }
+
+    /// Returns a relative path that, when joined onto `base`, yields `self`.
+    ///
+    /// # Errors
+    ///
+    /// If `base` is not a prefix of `self` (i.e. [`starts_with`]
+    /// returns `false`), returns [`Err`].
+    ///
+    /// [`starts_with`]: #method.starts_with
+    /// [`Err`]: std::result::Result
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// let path = RelativePath::new("test/haha/foo.txt");
+    ///
+    /// assert_eq!(path.strip_prefix("test"), Ok(RelativePath::new("haha/foo.txt")));
+    /// assert_eq!(path.strip_prefix("test").is_ok(), true);
+    /// assert_eq!(path.strip_prefix("haha").is_ok(), false);
+    /// ```
+    pub fn strip_prefix<'a, P: ?Sized>(&'a self, base: &'a P) -> Result<&'a RelativePath, StripPrefixError>
+        where P: AsRef<RelativePath>
+    {
+        iter_after(self.components(), base.as_ref().components())
+            .map(|c| c.as_relative_path())
+            .ok_or(StripPrefixError(()))
+    }
+
+    /// Determines whether `base` is a prefix of `self`.
+    ///
+    /// Only considers whole path components to match.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// let path = RelativePath::new("etc/passwd");
+    ///
+    /// assert!(path.starts_with("etc"));
+    ///
+    /// assert!(!path.starts_with("e"));
+    /// ```
+    pub fn starts_with<P: AsRef<RelativePath>>(&self, base: P) -> bool {
+        iter_after(self.components(), base.as_ref().components()).is_some()
+    }
+
+    /// Determines whether `child` is a suffix of `self`.
+    ///
+    /// Only considers whole path components to match.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// let path = RelativePath::new("etc/passwd");
+    ///
+    /// assert!(path.ends_with("passwd"));
+    /// ```
+    pub fn ends_with<P: AsRef<RelativePath>>(&self, child: P) -> bool {
+        iter_after(self.components().rev(), child.as_ref().components().rev()).is_some()
     }
 
     /// Creates an owned [`RelativePathBuf`] like `self` but with the given file name.
@@ -1539,8 +1660,6 @@ mod tests {
         t!(borrowed, owned, borrowed_cow, owned_cow);
     }
 
-    // TODO: fixme
-    /*
     #[test]
     pub fn test_compare() {
         use std::hash::{Hash, Hasher};
@@ -1577,7 +1696,7 @@ mod tests {
                          $ends_with, ends_with);
 
                  let relative_from = path1.strip_prefix(path2)
-                                          .map(|p| p.to_str().unwrap())
+                                          .map(|p| p.as_str())
                                           .ok();
                  let exp: Option<&str> = $relative_from;
                  assert!(relative_from == exp,
@@ -1641,15 +1760,7 @@ mod tests {
             ends_with: false,
             relative_from: None
             );
-
-        tc!("./foo/bar/", ".",
-            eq: false,
-            starts_with: true,
-            ends_with: false,
-            relative_from: Some("foo/bar")
-            );
     }
-    */
 
     #[test]
     fn test_join() {

@@ -8,10 +8,34 @@
 //! following characteristics:
 //!
 //! * The path separator is set to a fixed character (`/`), regardless of platform.
-//! * Relative paths cannot represent an absolute path in the filesystem, without first specifying
-//!   what they are relative to through [`to_path`].
+//! * The parent of a logical single component (like `foo`, `./foo`, and `foo/.`) is [`None`]
+//!   instead of `Some("")`.
+//! * Relative paths cannot represent a path in the filesystem, without first specifying what they
+//!   are relative to through [`to_path`].
+//!
+//! When two relative paths are compared to each other, their exact component makeup is significant
+//! account:
+//!
+//! ```rust
+//! use relative_path::RelativePath;
+//!
+//! assert!(RelativePath::new("foo/bar/../baz") != RelativePath::new("foo/baz"));
+//! ```
+//!
+//! Two see if two logical paths are equivalent, use [`normalize`] first:
+//!
+//! ```rust
+//! use relative_path::RelativePath;
+//!
+//! assert_eq!(
+//!     RelativePath::new("foo/bar/../baz").normalize(),
+//!     RelativePath::new("foo/baz").normalize(),
+//! );
+//! ```
 //!
 //! [`to_path`]: struct.RelativePath.html#method.to_path
+//! [`normalize`]: struct.RelativePath.html#method.normalize
+//! [`None`]: std::option::Option
 //!
 //! # Serde Support
 //!
@@ -37,36 +61,37 @@ const CUR_BYTE: u8 = CUR as u8;
 const SEP: char = '/';
 const SEP_BYTE: u8 = SEP as u8;
 
+/// Helper function to scan backwards, until the given `pattern` no longer matches or we run out of
+/// source to scan.
 #[inline(always)]
-fn scan_back<P>(mut n: usize, source: &[u8], pattern: P) -> usize
+fn scan_back<P>(mut n: usize, s: &[u8], pattern: P) -> usize
     where P: Fn(u8, Option<u8>) -> bool
 {
-    while n > 0 {
-        if !pattern(source[n - 1], if n > 1 { Some(source[n - 2]) } else { None }) {
-            break;
-        }
-
+    while n > 0 && pattern(s[n - 1], if n > 1 { Some(s[n - 2]) } else { None }) {
         n -= 1;
     }
 
     n
 }
 
+/// Helper function to scan forwards, until the given `pattern` no longer matches or we run out of
+/// source to scan.
 #[inline(always)]
-fn scan_forward<P>(mut n: usize, source: &[u8], pattern: P) -> usize
+fn scan_forward<P>(mut n: usize, s: &[u8], pattern: P) -> usize
     where P: Fn(u8, Option<u8>) -> bool
 {
-    while n < source.len() {
-        if !pattern(source[n], if n + 1 < source.len() { Some(source[n + 1]) } else { None }) {
-            break;
-        }
-
+    while n < s.len() && pattern(s[n], s.get(n + 1).cloned()) {
         n += 1;
     }
 
     n
 }
 
+/// Helper function to scan for separator.
+///
+/// A separator is:
+/// * A slash (`/`).
+/// * A dot (`.`) immediately followed by a slash (`/`) or nothing (current directory).
 fn scan_separator(a: u8, b: Option<u8>) -> bool {
     a == SEP_BYTE || a == CUR_BYTE && b.map(|c| c == SEP_BYTE).unwrap_or(true)
 }
@@ -121,11 +146,11 @@ impl<'a> Component<'a> {
     /// # Examples
     ///
     /// ```
-    /// use relative_path::RelativePath;
+    /// use relative_path::{RelativePath, Component};
     ///
-    /// let path = RelativePath::new("./tmp/foo/bar.txt");
-    /// let components: Vec<_> = path.components().map(|comp| comp.as_str()).collect();
-    /// assert_eq!(&components, &["tmp", "foo", "bar.txt"]);
+    /// let path = RelativePath::new("./tmp/../foo/bar.txt");
+    /// let components: Vec<_> = path.components().map(Component::as_str).collect();
+    /// assert_eq!(&components, &["tmp", "..", "foo", "bar.txt"]);
     /// ```
     ///
     /// [`str`]: str
@@ -955,8 +980,10 @@ impl RelativePath {
         RelativePathBuf::from(string)
     }
 
-    /// Return an owned `RelativePathBuf`, with all relative (current dir, parent dir) components
-    /// either removed or moved to the beginning of the path.
+    /// Return an owned `RelativePathBuf`, with all non-normal components moved to the beginning of
+    /// the path.
+    ///
+    /// This permits for a normalized representation of different relative components.
     ///
     /// Normalization is a _destructive_ operation if the path references an actual filesystem
     /// path.

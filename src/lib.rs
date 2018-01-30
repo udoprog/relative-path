@@ -327,6 +327,41 @@ impl<'a> DoubleEndedIterator for Iter<'a> {
     }
 }
 
+#[derive(Copy, Debug, Clone, PartialEq, Eq)]
+pub enum FromPathErrorKind {
+    /// Non-relative component in path.
+    NonRelative,
+    /// Non-utf8 component in path.
+    NonUtf8,
+}
+
+/// An error raised when attempting to convert a path using `RelativePathBuf::from_path`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FromPathError {
+    kind: FromPathErrorKind,
+}
+
+impl From<FromPathErrorKind> for FromPathError {
+    fn from(value: FromPathErrorKind) -> Self {
+        Self {
+            kind: value,
+        }
+    }
+}
+
+impl fmt::Display for FromPathError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use self::FromPathErrorKind::*;
+
+        let message = match self.kind {
+            NonRelative => "path contains non-relative component",
+            NonUtf8 => "path contains non-utf8 component",
+        };
+
+        message.fmt(fmt)
+    }
+}
+
 /// An owned, mutable relative path.
 ///
 /// This type provides methods to manipulate relative path objects.
@@ -339,6 +374,63 @@ impl RelativePathBuf {
     /// Create a new relative path buffer.
     pub fn new() -> RelativePathBuf {
         RelativePathBuf { inner: String::new() }
+    }
+
+    /// Convert a [`Path`] to a `RelativePathBuf`.
+    ///
+    /// [`Path`]: std::path::Path
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use relative_path::{RelativePath, RelativePathBuf, FromPathErrorKind};
+    /// use std::path::Path;
+    /// use std::ffi::OsStr;
+    ///
+    /// assert_eq!(
+    ///     Ok(RelativePath::new("foo/bar").to_owned()),
+    ///     RelativePathBuf::from_path(Path::new("foo/bar"))
+    /// );
+    ///
+    /// if cfg!(unix) {
+    ///     assert_eq!(
+    ///         Err(FromPathErrorKind::NonRelative.into()),
+    ///         RelativePathBuf::from_path(Path::new("/foo/bar"))
+    ///     );
+    ///
+    ///     use std::os::unix::ffi::OsStrExt;
+    ///
+    ///     // Continuation byte without continuation.
+    ///     let non_utf8 = OsStr::from_bytes(&[0x80u8]);
+    ///
+    ///     assert_eq!(
+    ///         Err(FromPathErrorKind::NonUtf8.into()),
+    ///         RelativePathBuf::from_path(Path::new(non_utf8))
+    ///     );
+    /// }
+    ///
+    /// if cfg!(windows) {
+    ///     assert_eq!(
+    ///         Err(FromPathErrorKind::NonRelative.into()),
+    ///         RelativePathBuf::from_path(Path::new("c:\\foo\\bar"))
+    ///     );
+    /// }
+    /// ```
+    pub fn from_path<P: AsRef<path::Path>>(path: P) -> Result<RelativePathBuf, FromPathError> {
+        use path::Component::*;
+
+        let mut buffer = RelativePathBuf::new();
+
+        for c in path.as_ref().components() {
+            match c {
+                Prefix(_) | RootDir => return Err(FromPathErrorKind::NonRelative.into()),
+                CurDir => continue,
+                ParentDir => buffer.push(".."),
+                Normal(s) => buffer.push(s.to_str().ok_or(FromPathErrorKind::NonUtf8)?),
+            }
+        }
+
+        Ok(buffer)
     }
 
     fn as_mut_vec(&mut self) -> &mut Vec<u8> {

@@ -43,6 +43,7 @@
 
 use std::borrow::{Borrow, Cow};
 use std::cmp;
+use std::error;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::{self, Deref};
@@ -351,14 +352,18 @@ impl From<FromPathErrorKind> for FromPathError {
 
 impl fmt::Display for FromPathError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        <Self as error::Error>::description(self).fmt(fmt)
+    }
+}
+
+impl error::Error for FromPathError {
+    fn description(&self) -> &str {
         use self::FromPathErrorKind::*;
 
-        let message = match self.kind {
+        match self.kind {
             NonRelative => "path contains non-relative component",
             NonUtf8 => "path contains non-utf8 component",
-        };
-
-        message.fmt(fmt)
+        }
     }
 }
 

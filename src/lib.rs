@@ -66,7 +66,8 @@ const SEP_BYTE: u8 = SEP as u8;
 /// source to scan.
 #[inline(always)]
 fn scan_back<P>(mut n: usize, s: &[u8], pattern: P) -> usize
-    where P: Fn(u8, Option<u8>) -> bool
+where
+    P: Fn(u8, Option<u8>) -> bool,
 {
     while n > 0 && pattern(s[n - 1], if n > 1 { Some(s[n - 2]) } else { None }) {
         n -= 1;
@@ -79,7 +80,8 @@ fn scan_back<P>(mut n: usize, s: &[u8], pattern: P) -> usize
 /// source to scan.
 #[inline(always)]
 fn scan_forward<P>(mut n: usize, s: &[u8], pattern: P) -> usize
-    where P: Fn(u8, Option<u8>) -> bool
+where
+    P: Fn(u8, Option<u8>) -> bool,
 {
     while n < s.len() && pattern(s[n], s.get(n + 1).cloned()) {
         n += 1;
@@ -118,9 +120,10 @@ fn split_file_at_dot(input: &str) -> (Option<&str>, Option<&str>) {
 // is not a prefix of `iter`, otherwise return `Some(iter_after_prefix)` giving
 // `iter` after having exhausted `prefix`.
 fn iter_after<A, I, J>(mut iter: I, mut prefix: J) -> Option<I>
-    where I: Iterator<Item = A> + Clone,
-          J: Iterator<Item = A>,
-          A: PartialEq
+where
+    I: Iterator<Item = A> + Clone,
+    J: Iterator<Item = A>,
+    A: PartialEq,
 {
     loop {
         let mut iter_next = iter.clone();
@@ -171,20 +174,19 @@ impl<'a> Component<'a> {
 /// last item or further adds parent components.
 #[inline(always)]
 fn relative_traversal<'a, C>(stack: &mut Vec<Component<'a>>, components: C)
-    where C: IntoIterator<Item = Component<'a>>
+where
+    C: IntoIterator<Item = Component<'a>>,
 {
     use self::Component::*;
 
     for c in components.into_iter() {
         match c {
-            ParentDir => {
-                match stack.last() {
-                    Some(&ParentDir) | None => {
-                        stack.push(ParentDir);
-                    }
-                    _ => {
-                        stack.pop();
-                    }
+            ParentDir => match stack.last() {
+                Some(&ParentDir) | None => {
+                    stack.push(ParentDir);
+                }
+                _ => {
+                    stack.pop();
                 }
             },
             Normal(name) => stack.push(Normal(name)),
@@ -239,7 +241,9 @@ impl<'a> DoubleEndedIterator for Components<'a> {
 
 impl<'a> Components<'a> {
     pub fn new(input: &str) -> Components {
-        Components { source: input.as_bytes() }
+        Components {
+            source: input.as_bytes(),
+        }
     }
 
     /// Extracts a slice corresponding to the portion of the path remaining for iteration.
@@ -344,9 +348,7 @@ pub struct FromPathError {
 
 impl From<FromPathErrorKind> for FromPathError {
     fn from(value: FromPathErrorKind) -> Self {
-        Self {
-            kind: value,
-        }
+        Self { kind: value }
     }
 }
 
@@ -378,7 +380,9 @@ pub struct RelativePathBuf {
 impl RelativePathBuf {
     /// Create a new relative path buffer.
     pub fn new() -> RelativePathBuf {
-        RelativePathBuf { inner: String::new() }
+        RelativePathBuf {
+            inner: String::new(),
+        }
     }
 
     /// Convert a [`Path`] to a `RelativePathBuf`.
@@ -568,7 +572,6 @@ impl RelativePathBuf {
         true
     }
 
-
     /// Truncates `self` to [`self.parent`].
     ///
     /// Returns `false` and does nothing if [`self.file_name`] is [`None`].
@@ -648,7 +651,9 @@ impl Borrow<RelativePath> for RelativePathBuf {
 
 impl<'a, T: ?Sized + AsRef<str>> From<&'a T> for RelativePathBuf {
     fn from(path: &'a T) -> RelativePathBuf {
-        RelativePathBuf { inner: path.as_ref().to_owned() }
+        RelativePathBuf {
+            inner: path.as_ref().to_owned(),
+        }
     }
 }
 
@@ -750,9 +755,7 @@ impl RelativePath {
     /// println!("{}", path.display());
     /// ```
     pub fn display(&self) -> Display {
-        Display {
-            path: self
-        }
+        Display { path: self }
     }
 
     /// Creates an owned [`RelativePathBuf`] with path adjoined to self.
@@ -812,7 +815,9 @@ impl RelativePath {
     /// assert_eq!(it.next(), None)
     /// ```
     pub fn iter(&self) -> Iter {
-        Iter { inner: self.components() }
+        Iter {
+            inner: self.components(),
+        }
     }
 
     /// Convert to an owned [`RelativePathBuf`].
@@ -851,15 +856,17 @@ impl RelativePath {
     /// assert_eq!(None, RelativePath::new("").parent());
     /// ```
     pub fn parent(&self) -> Option<&RelativePath> {
-        self.components().next_back_component().and_then(|(_, size)| {
-            let slice = &self.inner[..self.inner.len() - size];
+        self.components()
+            .next_back_component()
+            .and_then(|(_, size)| {
+                let slice = &self.inner[..self.inner.len() - size];
 
-            if slice.is_empty() {
-                return None;
-            }
+                if slice.is_empty() {
+                    return None;
+                }
 
-            Some(RelativePath::new(slice))
-        })
+                Some(RelativePath::new(slice))
+            })
     }
 
     /// Returns the final component of the `RelativePath`, if there is one.
@@ -912,8 +919,12 @@ impl RelativePath {
     /// assert_eq!(path.strip_prefix("test").is_ok(), true);
     /// assert_eq!(path.strip_prefix("haha").is_ok(), false);
     /// ```
-    pub fn strip_prefix<'a, P: ?Sized>(&'a self, base: &'a P) -> Result<&'a RelativePath, StripPrefixError>
-        where P: AsRef<RelativePath>
+    pub fn strip_prefix<'a, P: ?Sized>(
+        &'a self,
+        base: &'a P,
+    ) -> Result<&'a RelativePath, StripPrefixError>
+    where
+        P: AsRef<RelativePath>,
     {
         iter_after(self.components(), base.as_ref().components())
             .map(|c| c.as_relative_path())
@@ -1003,7 +1014,9 @@ impl RelativePath {
     /// assert_eq!("foo", path.file_stem().unwrap());
     /// ```
     pub fn file_stem(&self) -> Option<&str> {
-        self.file_name().map(split_file_at_dot).and_then(|(before, after)| before.or(after))
+        self.file_name()
+            .map(split_file_at_dot)
+            .and_then(|(before, after)| before.or(after))
     }
 
     /// Extracts the extension of [`self.file_name`], if possible.
@@ -1028,7 +1041,9 @@ impl RelativePath {
     /// assert_eq!(Some("rs"), RelativePath::new("foo.rs/.").extension());
     /// ```
     pub fn extension(&self) -> Option<&str> {
-        self.file_name().map(split_file_at_dot).and_then(|(before, after)| before.and(after))
+        self.file_name()
+            .map(split_file_at_dot)
+            .and_then(|(before, after)| before.and(after))
     }
 
     /// Creates an owned [`RelativePathBuf`] like `self` but with the given extension.
@@ -1073,7 +1088,11 @@ impl RelativePath {
         let mut stack = Vec::new();
         relative_traversal(&mut stack, self.components());
         relative_traversal(&mut stack, path.as_ref().components());
-        let string = stack.into_iter().map(|c| c.as_str()).collect::<Vec<_>>().join("/");
+        let string = stack
+            .into_iter()
+            .map(|c| c.as_str())
+            .collect::<Vec<_>>()
+            .join("/");
         RelativePathBuf::from(string)
     }
 
@@ -1103,7 +1122,11 @@ impl RelativePath {
     pub fn normalize(&self) -> RelativePathBuf {
         let mut stack = Vec::new();
         relative_traversal(&mut stack, self.components());
-        let string = stack.into_iter().map(|c| c.as_str()).collect::<Vec<_>>().join("/");
+        let string = stack
+            .into_iter()
+            .map(|c| c.as_str())
+            .collect::<Vec<_>>()
+            .join("/");
         RelativePathBuf::from(string)
     }
 
@@ -1263,7 +1286,7 @@ impl serde::ser::Serialize for RelativePath {
 }
 
 macro_rules! impl_cmp {
-    ($lhs:ty, $rhs: ty) => {
+    ($lhs:ty, $rhs:ty) => {
         impl<'a, 'b> PartialEq<$rhs> for $lhs {
             #[inline]
             fn eq(&self, other: &$rhs) -> bool {
@@ -1291,7 +1314,7 @@ macro_rules! impl_cmp {
                 <RelativePath as PartialOrd>::partial_cmp(self, other)
             }
         }
-    }
+    };
 }
 
 impl_cmp!(RelativePathBuf, RelativePath);
@@ -1301,7 +1324,7 @@ impl_cmp!(Cow<'a, RelativePath>, &'b RelativePath);
 impl_cmp!(Cow<'a, RelativePath>, RelativePathBuf);
 
 macro_rules! impl_cmp_str {
-    ($lhs:ty, $rhs: ty) => {
+    ($lhs:ty, $rhs:ty) => {
         impl<'a, 'b> PartialEq<$rhs> for $lhs {
             #[inline]
             fn eq(&self, other: &$rhs) -> bool {
@@ -1329,7 +1352,7 @@ macro_rules! impl_cmp_str {
                 <RelativePath as PartialOrd>::partial_cmp(self.as_ref(), other)
             }
         }
-    }
+    };
 }
 
 impl_cmp_str!(RelativePathBuf, str);
@@ -1343,8 +1366,8 @@ impl_cmp_str!(&'a RelativePath, String);
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
     use super::*;
+    use std::path::Path;
 
     macro_rules! t(
         ($path:expr, iter: $iter:expr) => (
@@ -1411,7 +1434,11 @@ mod tests {
     );
 
     fn assert_components(components: &[&str], path: &RelativePath) {
-        let components = components.iter().cloned().map(Component::Normal).collect::<Vec<_>>();
+        let components = components
+            .iter()
+            .cloned()
+            .map(Component::Normal)
+            .collect::<Vec<_>>();
         let result: Vec<_> = path.components().collect();
         assert_eq!(&components[..], &result[..]);
     }
@@ -1671,22 +1698,12 @@ mod tests {
            extension: Some("")
            );
 
-        t!(".",
-           file_stem: None,
-           extension: None
-           );
+        t!(".", file_stem: None, extension: None);
 
-        t!("..",
-           file_stem: None,
-           extension: None
-           );
+        t!("..", file_stem: None, extension: None);
 
-        t!("",
-           file_stem: None,
-           extension: None
-           );
+        t!("", file_stem: None, extension: None);
     }
-
 
     #[test]
     pub fn test_set_file_name() {
@@ -1769,8 +1786,8 @@ mod tests {
 
     #[test]
     pub fn test_compare() {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         fn hash<T: Hash>(t: T) -> u64 {
             let mut s = DefaultHasher::new();
@@ -1921,9 +1938,15 @@ mod tests {
         let path = rp("baz/./bar/foo//./.");
 
         assert_eq!(Some(rp("baz/bar")), path.parent());
-        assert_eq!(Some(rp("baz")), path.parent().and_then(RelativePath::parent));
-        assert_eq!(None,
-            path.parent().and_then(RelativePath::parent).and_then(RelativePath::parent)
+        assert_eq!(
+            Some(rp("baz")),
+            path.parent().and_then(RelativePath::parent)
+        );
+        assert_eq!(
+            None,
+            path.parent()
+                .and_then(RelativePath::parent)
+                .and_then(RelativePath::parent)
         );
     }
 
@@ -1937,10 +1960,7 @@ mod tests {
 
     #[test]
     fn test_normalize() {
-        assert_eq!(
-            rp("c/d"),
-            rp("a/.././b/../c/d").normalize()
-        );
+        assert_eq!(rp("c/d"), rp("a/.././b/../c/d").normalize());
     }
 
     #[test]
@@ -1963,18 +1983,12 @@ mod tests {
             RelativePathBuf::from(String::from("foo/bar")),
         );
 
-        assert_eq!(
-            rp("foo/bar").to_owned(),
-            RelativePathBuf::from("foo/bar"),
-        );
+        assert_eq!(rp("foo/bar").to_owned(), RelativePathBuf::from("foo/bar"),);
     }
 
     #[test]
     fn test_default() {
-        assert_eq!(
-            RelativePathBuf::new(),
-            RelativePathBuf::default(),
-        );
+        assert_eq!(RelativePathBuf::new(), RelativePathBuf::default(),);
     }
 
     #[test]

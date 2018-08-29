@@ -5,7 +5,7 @@ rust:
   - stable
 sudo: false
 cache: cargo
-before_script: rustup add rustfmt-preview
+before_script: rustup component add rustfmt-preview
 script:
   - cargo fmt -- --write-mode=diff
   - cargo build --verbose

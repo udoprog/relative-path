@@ -13,7 +13,7 @@
 //! * Relative paths cannot represent a path in the filesystem, without first specifying what they
 //!   are relative to through [`to_path`].
 //!
-//! When two relative paths are compared to each other, their exact component makeup is significant
+//! When two relative paths are compared to each other, their exact component makeup is taken into
 //! account:
 //!
 //! ```rust
@@ -22,7 +22,7 @@
 //! assert!(RelativePath::new("foo/bar/../baz") != RelativePath::new("foo/baz"));
 //! ```
 //!
-//! Two see if two logical paths are equivalent, use [`normalize`] first:
+//! To see if two logical paths are equivalent, use [`normalize`] first:
 //!
 //! ```rust
 //! use relative_path::RelativePath;

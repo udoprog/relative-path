@@ -3,6 +3,7 @@
 Portable, relative paths for Rust.
 
 [![Build Status](https://api.travis-ci.org/udoprog/relative-path.svg?branch=master)](https://travis-ci.org/udoprog/relative-path)
+[![Build status](https://ci.appveyor.com/api/projects/status/x2spyavt5fe6lbeq?svg=true)](https://ci.appveyor.com/project/udoprog/relative-path/branch/master)
 
 [Documentation](https://docs.rs/relative-path)
 

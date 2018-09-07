@@ -22,7 +22,20 @@
 //! assert!(RelativePath::new("foo/bar/../baz") != RelativePath::new("foo/baz"));
 //! ```
 //!
-//! To see if two logical paths are equivalent, use [`normalize`] first:
+//! Using platform-specific path separators to construct relative paths is not supported.
+//!
+//! Path separators from other platforms are therefore treated as part of the component:
+//!
+//! ```rust
+//! use relative_path::RelativePath;
+//!
+//! assert_ne!(RelativePath::new("foo/bar"), RelativePath::new("foo\\bar"));
+//!
+//! assert_eq!(1, RelativePath::new("foo\\bar").components().count());
+//! assert_eq!(2, RelativePath::new("foo/bar").components().count());
+//! ```
+//!
+//! To see if two logical paths are equivalent you can use [`normalize`]:
 //!
 //! ```rust
 //! use relative_path::RelativePath;

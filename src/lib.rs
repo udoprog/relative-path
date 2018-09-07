@@ -22,7 +22,20 @@
 //! assert!(RelativePath::new("foo/bar/../baz") != RelativePath::new("foo/baz"));
 //! ```
 //!
-//! To see if two logical paths are equivalent, use [`normalize`] first:
+//! Using platform-specific path separators to construct relative paths is not supported.
+//!
+//! Path separators from other platforms are therefore treated as part of the component:
+//!
+//! ```rust
+//! use relative_path::RelativePath;
+//!
+//! assert_ne!(RelativePath::new("foo/bar"), RelativePath::new("foo\\bar"));
+//!
+//! assert_eq!(1, RelativePath::new("foo\\bar").components().count());
+//! assert_eq!(2, RelativePath::new("foo/bar").components().count());
+//! ```
+//!
+//! To see if two logical paths are equivalent you can use [`normalize`]:
 //!
 //! ```rust
 //! use relative_path::RelativePath;
@@ -338,6 +351,8 @@ pub enum FromPathErrorKind {
     NonRelative,
     /// Non-utf8 component in path.
     NonUtf8,
+    /// Trying to convert a platform-specific path which uses a platform-specific separator.
+    BadSeparator,
 }
 
 /// An error raised when attempting to convert a path using `RelativePathBuf::from_path`.
@@ -365,6 +380,7 @@ impl error::Error for FromPathError {
         match self.kind {
             NonRelative => "path contains non-relative component",
             NonUtf8 => "path contains non-utf8 component",
+            BadSeparator => "path contains platform-specific path separator",
         }
     }
 }
@@ -385,7 +401,7 @@ impl RelativePathBuf {
         }
     }
 
-    /// Convert a [`Path`] to a `RelativePathBuf`.
+    /// Try to convert a [`Path`] to a `RelativePathBuf`.
     ///
     /// [`Path`]: std::path::Path
     ///
@@ -693,6 +709,52 @@ impl RelativePath {
     /// Directly wraps a string slice as a `RelativePath` slice.
     pub fn new<S: AsRef<str> + ?Sized>(s: &S) -> &RelativePath {
         unsafe { &*(s.as_ref() as *const str as *const RelativePath) }
+    }
+
+    /// Try to convert a [`Path`] to a `RelativePath` without allocating a buffer.
+    ///
+    /// This requires the Path to be a legal, platform-neutral relative path.
+    ///
+    /// [`Path`]: std::path::Path
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use relative_path::{RelativePath, FromPathErrorKind};
+    /// use std::path::Path;
+    /// use std::ffi::OsStr;
+    ///
+    /// assert_eq!(
+    ///     Ok(RelativePath::new("foo/bar")),
+    ///     RelativePath::from_path("foo/bar")
+    /// );
+    /// ```
+    pub fn from_path<'a, P: ?Sized + AsRef<path::Path>>(
+        path: &'a P,
+    ) -> Result<&'a RelativePath, FromPathError> {
+        use path::Component::*;
+
+        let other = path.as_ref();
+
+        let s = match other.to_str() {
+            Some(s) => s,
+            None => return Err(FromPathErrorKind::NonUtf8.into()),
+        };
+
+        let rel = RelativePath::new(s);
+
+        // check that the component compositions are equal.
+        for (a, b) in other.components().zip(rel.components()) {
+            match (a, b) {
+                (Prefix(_), _) | (RootDir, _) => return Err(FromPathErrorKind::NonRelative.into()),
+                (CurDir, Component::Normal(".")) => continue,
+                (ParentDir, Component::Normal("..")) => continue,
+                (Normal(a), Component::Normal(b)) if a == b => continue,
+                _ => return Err(FromPathErrorKind::BadSeparator.into()),
+            }
+        }
+
+        Ok(rel)
     }
 
     // The following (private!) function allows construction of a path from a u8
@@ -2013,6 +2075,40 @@ mod tests {
         tp!("foo/bar", "foo", true);
         tp!("foo/.", "foo/.", false);
         tp!("foo//bar", "foo", true);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    pub fn test_unix_from_path() {
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+
+        assert_eq!(
+            Err(FromPathErrorKind::NonRelative.into()),
+            RelativePath::from_path("/foo/bar")
+        );
+
+        // Continuation byte without continuation.
+        let non_utf8 = OsStr::from_bytes(&[0x80u8]);
+
+        assert_eq!(
+            Err(FromPathErrorKind::NonUtf8.into()),
+            RelativePath::from_path(non_utf8)
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    pub fn test_windows_from_path() {
+        assert_eq!(
+            Err(FromPathErrorKind::NonRelative.into()),
+            RelativePath::from_path("c:\\foo\\bar")
+        );
+
+        assert_eq!(
+            Err(FromPathErrorKind::BadSeparator.into()),
+            RelativePath::from_path("foo\\bar")
+        );
     }
 
     #[cfg(unix)]

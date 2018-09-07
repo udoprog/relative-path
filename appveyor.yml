@@ -1,0 +1,19 @@
+environment:
+  global:
+    PROJECT_NAME: relative-path
+  matrix:
+    - TARGET: x86_64-pc-windows-msvc
+      CHANNEL: stable
+
+install:
+  - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64'
+  - curl -sSf -o rustup-init.exe https://win.rustup.rs
+  - rustup-init.exe --default-host %TARGET% --default-toolchain %CHANNEL% -y
+  - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
+  - rustc -Vv
+  - cargo -V
+
+build: false
+
+test_script:
+  - cargo test

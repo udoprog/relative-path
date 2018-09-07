@@ -400,30 +400,6 @@ impl RelativePathBuf {
     ///     Ok(RelativePath::new("foo/bar").to_owned()),
     ///     RelativePathBuf::from_path(Path::new("foo/bar"))
     /// );
-    ///
-    /// if cfg!(unix) {
-    ///     assert_eq!(
-    ///         Err(FromPathErrorKind::NonRelative.into()),
-    ///         RelativePathBuf::from_path(Path::new("/foo/bar"))
-    ///     );
-    ///
-    ///     use std::os::unix::ffi::OsStrExt;
-    ///
-    ///     // Continuation byte without continuation.
-    ///     let non_utf8 = OsStr::from_bytes(&[0x80u8]);
-    ///
-    ///     assert_eq!(
-    ///         Err(FromPathErrorKind::NonUtf8.into()),
-    ///         RelativePathBuf::from_path(Path::new(non_utf8))
-    ///     );
-    /// }
-    ///
-    /// if cfg!(windows) {
-    ///     assert_eq!(
-    ///         Err(FromPathErrorKind::NonRelative.into()),
-    ///         RelativePathBuf::from_path(Path::new("c:\\foo\\bar"))
-    ///     );
-    /// }
     /// ```
     pub fn from_path<P: AsRef<path::Path>>(path: P) -> Result<RelativePathBuf, FromPathError> {
         use path::Component::*;
@@ -2037,5 +2013,34 @@ mod tests {
         tp!("foo/bar", "foo", true);
         tp!("foo/.", "foo/.", false);
         tp!("foo//bar", "foo", true);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    pub fn test_unix_owned_from_path() {
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+
+        assert_eq!(
+            Err(FromPathErrorKind::NonRelative.into()),
+            RelativePathBuf::from_path(Path::new("/foo/bar"))
+        );
+
+        // Continuation byte without continuation.
+        let non_utf8 = OsStr::from_bytes(&[0x80u8]);
+
+        assert_eq!(
+            Err(FromPathErrorKind::NonUtf8.into()),
+            RelativePathBuf::from_path(Path::new(non_utf8))
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    pub fn test_windows_owned_from_path() {
+        assert_eq!(
+            Err(FromPathErrorKind::NonRelative.into()),
+            RelativePathBuf::from_path(Path::new("c:\\foo\\bar"))
+        );
     }
 }

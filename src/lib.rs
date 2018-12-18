@@ -1252,6 +1252,12 @@ impl fmt::Display for RelativePath {
     }
 }
 
+impl fmt::Display for RelativePathBuf {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.inner, f)
+    }
+}
+
 /// Helper struct for printing relative paths.
 ///
 /// This is not strictly necessary in the same sense as it is for [`std::path::Display`], because
@@ -2082,6 +2088,16 @@ mod tests {
         tp!("foo/bar", "foo", true);
         tp!("foo/.", "foo/.", false);
         tp!("foo//bar", "foo", true);
+    }
+
+    #[test]
+    pub fn test_display() {
+        // NB: display delegated to the underlying string.
+        assert_eq!(RelativePathBuf::from("foo/bar").to_string(), "foo/bar");
+        assert_eq!(RelativePath::new("foo/bar").to_string(), "foo/bar");
+
+        assert_eq!(format!("{}", RelativePathBuf::from("foo/bar")), "foo/bar");
+        assert_eq!(format!("{}", RelativePath::new("foo/bar")), "foo/bar");
     }
 
     #[cfg(unix)]

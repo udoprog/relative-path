@@ -418,7 +418,7 @@ impl RelativePathBuf {
     /// );
     /// ```
     pub fn from_path<P: AsRef<path::Path>>(path: P) -> Result<RelativePathBuf, FromPathError> {
-        use path::Component::*;
+        use std::path::Component::*;
 
         let mut buffer = RelativePathBuf::new();
 
@@ -732,7 +732,7 @@ impl RelativePath {
     pub fn from_path<'a, P: ?Sized + AsRef<path::Path>>(
         path: &'a P,
     ) -> Result<&'a RelativePath, FromPathError> {
-        use path::Component::*;
+        use std::path::Component::*;
 
         let other = path.as_ref();
 

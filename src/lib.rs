@@ -792,6 +792,7 @@ impl RelativePath {
     ///
     /// println!("{}", path.display());
     /// ```
+    #[deprecated(note = "RelativePath implements std::fmt::Display directly")]
     pub fn display(&self) -> Display {
         Display { path: self }
     }
@@ -1245,6 +1246,12 @@ impl Hash for RelativePath {
     }
 }
 
+impl fmt::Display for RelativePath {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.inner, f)
+    }
+}
+
 /// Helper struct for printing relative paths.
 ///
 /// This is not strictly necessary in the same sense as it is for [`std::path::Display`], because
@@ -1265,7 +1272,7 @@ impl<'a> fmt::Debug for Display<'a> {
 
 impl<'a> fmt::Display for Display<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.path.inner.fmt(f)
+        fmt::Display::fmt(&self.path, f)
     }
 }
 

@@ -418,7 +418,7 @@ impl RelativePathBuf {
     /// );
     /// ```
     pub fn from_path<P: AsRef<path::Path>>(path: P) -> Result<RelativePathBuf, FromPathError> {
-        use path::Component::*;
+        use std::path::Component::*;
 
         let mut buffer = RelativePathBuf::new();
 
@@ -732,7 +732,7 @@ impl RelativePath {
     pub fn from_path<'a, P: ?Sized + AsRef<path::Path>>(
         path: &'a P,
     ) -> Result<&'a RelativePath, FromPathError> {
-        use path::Component::*;
+        use std::path::Component::*;
 
         let other = path.as_ref();
 
@@ -792,6 +792,7 @@ impl RelativePath {
     ///
     /// println!("{}", path.display());
     /// ```
+    #[deprecated(note = "RelativePath implements std::fmt::Display directly")]
     pub fn display(&self) -> Display {
         Display { path: self }
     }
@@ -1245,6 +1246,18 @@ impl Hash for RelativePath {
     }
 }
 
+impl fmt::Display for RelativePath {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.inner, f)
+    }
+}
+
+impl fmt::Display for RelativePathBuf {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.inner, f)
+    }
+}
+
 /// Helper struct for printing relative paths.
 ///
 /// This is not strictly necessary in the same sense as it is for [`std::path::Display`], because
@@ -1265,7 +1278,7 @@ impl<'a> fmt::Debug for Display<'a> {
 
 impl<'a> fmt::Display for Display<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.path.inner.fmt(f)
+        fmt::Display::fmt(&self.path, f)
     }
 }
 
@@ -1488,253 +1501,253 @@ mod tests {
     #[test]
     pub fn test_decompositions() {
         t!("",
-           iter: [],
-           parent: None,
-           file_name: None,
-           file_stem: None,
-           extension: None
-           );
+        iter: [],
+        parent: None,
+        file_name: None,
+        file_stem: None,
+        extension: None
+        );
 
         t!("foo",
-           iter: ["foo"],
-           parent: None,
-           file_name: Some("foo"),
-           file_stem: Some("foo"),
-           extension: None
-           );
+        iter: ["foo"],
+        parent: None,
+        file_name: Some("foo"),
+        file_stem: Some("foo"),
+        extension: None
+        );
 
         t!("/",
-           iter: [],
-           parent: None,
-           file_name: None,
-           file_stem: None,
-           extension: None
-           );
+        iter: [],
+        parent: None,
+        file_name: None,
+        file_stem: None,
+        extension: None
+        );
 
         t!("/foo",
-           iter: ["foo"],
-           parent: None,
-           file_name: Some("foo"),
-           file_stem: Some("foo"),
-           extension: None
-           );
+        iter: ["foo"],
+        parent: None,
+        file_name: Some("foo"),
+        file_stem: Some("foo"),
+        extension: None
+        );
 
         t!("foo/",
-           iter: ["foo"],
-           parent: None,
-           file_name: Some("foo"),
-           file_stem: Some("foo"),
-           extension: None
-           );
+        iter: ["foo"],
+        parent: None,
+        file_name: Some("foo"),
+        file_stem: Some("foo"),
+        extension: None
+        );
 
         t!("/foo/",
-           iter: ["foo"],
-           parent: None,
-           file_name: Some("foo"),
-           file_stem: Some("foo"),
-           extension: None
-           );
+        iter: ["foo"],
+        parent: None,
+        file_name: Some("foo"),
+        file_stem: Some("foo"),
+        extension: None
+        );
 
         t!("foo/bar",
-           iter: ["foo", "bar"],
-           parent: Some("foo"),
-           file_name: Some("bar"),
-           file_stem: Some("bar"),
-           extension: None
-           );
+        iter: ["foo", "bar"],
+        parent: Some("foo"),
+        file_name: Some("bar"),
+        file_stem: Some("bar"),
+        extension: None
+        );
 
         t!("/foo/bar",
-           iter: ["foo", "bar"],
-           parent: Some("/foo"),
-           file_name: Some("bar"),
-           file_stem: Some("bar"),
-           extension: None
-           );
+        iter: ["foo", "bar"],
+        parent: Some("/foo"),
+        file_name: Some("bar"),
+        file_stem: Some("bar"),
+        extension: None
+        );
 
         t!("///foo///",
-           iter: ["foo"],
-           parent: None,
-           file_name: Some("foo"),
-           file_stem: Some("foo"),
-           extension: None
-           );
+        iter: ["foo"],
+        parent: None,
+        file_name: Some("foo"),
+        file_stem: Some("foo"),
+        extension: None
+        );
 
         t!("///foo///bar",
-           iter: ["foo", "bar"],
-           parent: Some("///foo"),
-           file_name: Some("bar"),
-           file_stem: Some("bar"),
-           extension: None
-           );
+        iter: ["foo", "bar"],
+        parent: Some("///foo"),
+        file_name: Some("bar"),
+        file_stem: Some("bar"),
+        extension: None
+        );
 
         t!("./.",
-           iter: [],
-           parent: None,
-           file_name: None,
-           file_stem: None,
-           extension: None
-           );
+        iter: [],
+        parent: None,
+        file_name: None,
+        file_stem: None,
+        extension: None
+        );
 
         t!("/..",
-           iter: [".."],
-           parent: None,
-           file_name: None,
-           file_stem: None,
-           extension: None
-           );
+        iter: [".."],
+        parent: None,
+        file_name: None,
+        file_stem: None,
+        extension: None
+        );
 
         t!("../",
-           iter: [".."],
-           parent: None,
-           file_name: None,
-           file_stem: None,
-           extension: None
-           );
+        iter: [".."],
+        parent: None,
+        file_name: None,
+        file_stem: None,
+        extension: None
+        );
 
         t!("foo/.",
-           iter: ["foo"],
-           parent: None,
-           file_name: Some("foo"),
-           file_stem: Some("foo"),
-           extension: None
-           );
+        iter: ["foo"],
+        parent: None,
+        file_name: Some("foo"),
+        file_stem: Some("foo"),
+        extension: None
+        );
 
         t!("foo/..",
-           iter: ["foo", ".."],
-           parent: Some("foo"),
-           file_name: None,
-           file_stem: None,
-           extension: None
-           );
+        iter: ["foo", ".."],
+        parent: Some("foo"),
+        file_name: None,
+        file_stem: None,
+        extension: None
+        );
 
         t!("foo/./",
-           iter: ["foo"],
-           parent: None,
-           file_name: Some("foo"),
-           file_stem: Some("foo"),
-           extension: None
-           );
+        iter: ["foo"],
+        parent: None,
+        file_name: Some("foo"),
+        file_stem: Some("foo"),
+        extension: None
+        );
 
         t!("foo/./bar",
-           iter: ["foo", "bar"],
-           parent: Some("foo"),
-           file_name: Some("bar"),
-           file_stem: Some("bar"),
-           extension: None
-           );
+        iter: ["foo", "bar"],
+        parent: Some("foo"),
+        file_name: Some("bar"),
+        file_stem: Some("bar"),
+        extension: None
+        );
 
         t!("foo/../",
-           iter: ["foo", ".."],
-           parent: Some("foo"),
-           file_name: None,
-           file_stem: None,
-           extension: None
-           );
+        iter: ["foo", ".."],
+        parent: Some("foo"),
+        file_name: None,
+        file_stem: None,
+        extension: None
+        );
 
         t!("foo/../bar",
-           iter: ["foo", "..", "bar"],
-           parent: Some("foo/.."),
-           file_name: Some("bar"),
-           file_stem: Some("bar"),
-           extension: None
-           );
+        iter: ["foo", "..", "bar"],
+        parent: Some("foo/.."),
+        file_name: Some("bar"),
+        file_stem: Some("bar"),
+        extension: None
+        );
 
         t!("./a",
-           iter: ["a"],
-           parent: None,
-           file_name: Some("a"),
-           file_stem: Some("a"),
-           extension: None
-           );
+        iter: ["a"],
+        parent: None,
+        file_name: Some("a"),
+        file_stem: Some("a"),
+        extension: None
+        );
 
         t!(".",
-           iter: [],
-           parent: None,
-           file_name: None,
-           file_stem: None,
-           extension: None
-           );
+        iter: [],
+        parent: None,
+        file_name: None,
+        file_stem: None,
+        extension: None
+        );
 
         t!("./",
-           iter: [],
-           parent: None,
-           file_name: None,
-           file_stem: None,
-           extension: None
-           );
+        iter: [],
+        parent: None,
+        file_name: None,
+        file_stem: None,
+        extension: None
+        );
 
         t!("a/b",
-           iter: ["a", "b"],
-           parent: Some("a"),
-           file_name: Some("b"),
-           file_stem: Some("b"),
-           extension: None
-           );
+        iter: ["a", "b"],
+        parent: Some("a"),
+        file_name: Some("b"),
+        file_stem: Some("b"),
+        extension: None
+        );
 
         t!("a//b",
-           iter: ["a", "b"],
-           parent: Some("a"),
-           file_name: Some("b"),
-           file_stem: Some("b"),
-           extension: None
-           );
+        iter: ["a", "b"],
+        parent: Some("a"),
+        file_name: Some("b"),
+        file_stem: Some("b"),
+        extension: None
+        );
 
         t!("a/./b",
-           iter: ["a", "b"],
-           parent: Some("a"),
-           file_name: Some("b"),
-           file_stem: Some("b"),
-           extension: None
-           );
+        iter: ["a", "b"],
+        parent: Some("a"),
+        file_name: Some("b"),
+        file_stem: Some("b"),
+        extension: None
+        );
 
         t!("a/b/c",
-           iter: ["a", "b", "c"],
-           parent: Some("a/b"),
-           file_name: Some("c"),
-           file_stem: Some("c"),
-           extension: None
-           );
+        iter: ["a", "b", "c"],
+        parent: Some("a/b"),
+        file_name: Some("c"),
+        file_stem: Some("c"),
+        extension: None
+        );
 
         t!(".foo",
-           iter: [".foo"],
-           parent: None,
-           file_name: Some(".foo"),
-           file_stem: Some(".foo"),
-           extension: None
-           );
+        iter: [".foo"],
+        parent: None,
+        file_name: Some(".foo"),
+        file_stem: Some(".foo"),
+        extension: None
+        );
     }
 
     #[test]
     pub fn test_stem_ext() {
         t!("foo",
-           file_stem: Some("foo"),
-           extension: None
-           );
+        file_stem: Some("foo"),
+        extension: None
+        );
 
         t!("foo.",
-           file_stem: Some("foo"),
-           extension: Some("")
-           );
+        file_stem: Some("foo"),
+        extension: Some("")
+        );
 
         t!(".foo",
-           file_stem: Some(".foo"),
-           extension: None
-           );
+        file_stem: Some(".foo"),
+        extension: None
+        );
 
         t!("foo.txt",
-           file_stem: Some("foo"),
-           extension: Some("txt")
-           );
+        file_stem: Some("foo"),
+        extension: Some("txt")
+        );
 
         t!("foo.bar.txt",
-           file_stem: Some("foo.bar"),
-           extension: Some("txt")
-           );
+        file_stem: Some("foo.bar"),
+        extension: Some("txt")
+        );
 
         t!("foo.bar.",
-           file_stem: Some("foo.bar"),
-           extension: Some("")
-           );
+        file_stem: Some("foo.bar"),
+        extension: Some("")
+        );
 
         t!(".", file_stem: None, extension: None);
 
@@ -1868,60 +1881,60 @@ mod tests {
         );
 
         tc!("", "",
-            eq: true,
-            starts_with: true,
-            ends_with: true,
-            relative_from: Some("")
-            );
+        eq: true,
+        starts_with: true,
+        ends_with: true,
+        relative_from: Some("")
+        );
 
         tc!("foo", "",
-            eq: false,
-            starts_with: true,
-            ends_with: true,
-            relative_from: Some("foo")
-            );
+        eq: false,
+        starts_with: true,
+        ends_with: true,
+        relative_from: Some("foo")
+        );
 
         tc!("", "foo",
-            eq: false,
-            starts_with: false,
-            ends_with: false,
-            relative_from: None
-            );
+        eq: false,
+        starts_with: false,
+        ends_with: false,
+        relative_from: None
+        );
 
         tc!("foo", "foo",
-            eq: true,
-            starts_with: true,
-            ends_with: true,
-            relative_from: Some("")
-            );
+        eq: true,
+        starts_with: true,
+        ends_with: true,
+        relative_from: Some("")
+        );
 
         tc!("foo/", "foo",
-            eq: true,
-            starts_with: true,
-            ends_with: true,
-            relative_from: Some("")
-            );
+        eq: true,
+        starts_with: true,
+        ends_with: true,
+        relative_from: Some("")
+        );
 
         tc!("foo/bar", "foo",
-            eq: false,
-            starts_with: true,
-            ends_with: false,
-            relative_from: Some("bar")
-            );
+        eq: false,
+        starts_with: true,
+        ends_with: false,
+        relative_from: Some("bar")
+        );
 
         tc!("foo/bar/baz", "foo/bar",
-            eq: false,
-            starts_with: true,
-            ends_with: false,
-            relative_from: Some("baz")
-            );
+        eq: false,
+        starts_with: true,
+        ends_with: false,
+        relative_from: Some("baz")
+        );
 
         tc!("foo/bar", "foo/bar/baz",
-            eq: false,
-            starts_with: false,
-            ends_with: false,
-            relative_from: None
-            );
+        eq: false,
+        starts_with: false,
+        ends_with: false,
+        relative_from: None
+        );
     }
 
     #[test]
@@ -2075,6 +2088,16 @@ mod tests {
         tp!("foo/bar", "foo", true);
         tp!("foo/.", "foo/.", false);
         tp!("foo//bar", "foo", true);
+    }
+
+    #[test]
+    pub fn test_display() {
+        // NB: display delegated to the underlying string.
+        assert_eq!(RelativePathBuf::from("foo/bar").to_string(), "foo/bar");
+        assert_eq!(RelativePath::new("foo/bar").to_string(), "foo/bar");
+
+        assert_eq!(format!("{}", RelativePathBuf::from("foo/bar")), "foo/bar");
+        assert_eq!(format!("{}", RelativePath::new("foo/bar")), "foo/bar");
     }
 
     #[cfg(unix)]

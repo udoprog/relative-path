@@ -108,8 +108,12 @@ where
 /// A separator is:
 /// * A slash (`/`).
 /// * A dot (`.`) immediately followed by a slash (`/`) or nothing (current directory).
-fn scan_separator(a: u8, b: Option<u8>) -> bool {
+fn scan_separator_skipdot(a: u8, b: Option<u8>) -> bool {
     a == SEP_BYTE || a == CUR_BYTE && b.map(|c| c == SEP_BYTE).unwrap_or(true)
+}
+
+fn scan_separator(a: u8, _: Option<u8>) -> bool {
+    a == SEP_BYTE
 }
 
 fn split_file_at_dot(input: &str) -> (Option<&str>, Option<&str>) {
@@ -153,6 +157,7 @@ where
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Component<'a> {
+    CurDir,
     ParentDir,
     Normal(&'a str),
 }
@@ -175,6 +180,7 @@ impl<'a> Component<'a> {
         use self::Component::*;
 
         match self {
+            CurDir => ".",
             ParentDir => PARENT_STR,
             Normal(name) => name,
         }
@@ -202,6 +208,7 @@ where
                     stack.pop();
                 }
             },
+            CurDir => (),
             Normal(name) => stack.push(Normal(name)),
         }
     }
@@ -240,6 +247,7 @@ impl<'a> Iterator for Components<'a> {
         let slice = unsafe { ::std::str::from_utf8_unchecked(slice) };
 
         match slice {
+            "."  => Some(Component::CurDir),
             ".." => Some(Component::ParentDir),
             slice => Some(Component::Normal(slice)),
         }
@@ -285,13 +293,13 @@ impl<'a> Components<'a> {
         let slice_end = self.source.len();
 
         // strip suffixing separators
-        let end = scan_back(slice_end, self.source, scan_separator);
+        let end = scan_back(slice_end, self.source, scan_separator_skipdot);
 
         // find component
         let start = scan_back(end, self.source, |a, _| a != SEP_BYTE);
 
         // strip prefixing separator
-        let slice_start = scan_back(start, self.source, scan_separator);
+        let slice_start = scan_back(start, self.source, scan_separator_skipdot);
 
         let slice = &self.source[start..end];
         self.source = &self.source[..slice_start];

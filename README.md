@@ -9,24 +9,29 @@ Portable, relative paths for Rust.
 
 ## Relative Paths
 
-This library provides two structures: `RelativePath` and `RelativePathBuf`.
+This library provides two types: `RelativePath` and `RelativePathBuf`.
 These are analogous to the `Path` and `PathBuf` structures provided through standard Rust.
 
-While `Path` provides an API that adapts to a given platform, `RelativePath` does not, making the
-representations it provide platform-neutral.
+While `Path` provides an API that adapts to a given platform, `RelativePath` does not.
+Instead `RelativePath` uses a fixed, slash-separated representation regardless of platform.
 
-The representation of Rust's `Path` is not portable since it permits different things across
-platforms.
+Windows permits using drive volumes as a prefix (e.g. `"c:\"`) and backslash (`\`) as a separator.
+Storing paths like this would build and run on one platform, but not others.
+Another hairy issue is that data serialized for one platform through serde might not be
+usable on another:
 
-Windows permit using drive volumes (e.g. `"c:\"`) and backslash (`\`) as a separator.
-Using this to store relative paths would make it possible for software developers working to target
-Windows to build projects which work on their platform, but not others.
+```rust
+#[derive(Serialize, Deserialize)]
+struct Message {
+    path: PathBuf,
+}
+```
 
-`RelativePath` only uses `/` as a separator. Anything else will be considered part of distinct
-components.
+Since `RelativePath` only uses `/` as a separator it avoids this issue.
+Anything non-slash else will be considered part of a distinc component.
 
-Conversion to `Path` can only happen if it is known which path it is relative to, through the
-`to_path` function. This is where the 'relative' part of the name comes from.
+Conversion to `Path` may only happen if it is known which path it is relative to through the
+`to_path` function. This is where the relative part of the name comes from.
 
 ```rust
 let relative_path = RelativePath::new("foo/bar");
@@ -34,17 +39,17 @@ let path = Path::new("C:\\");
 let full_path = relative_path.to_path(path);
 ```
 
-This would for example, permit relative paths to portably be used in project manifests or
-configurations, where files are references from some specific, well-known point in the filesystem.
+This would permit relative paths to portably be used in project manifests or configurations.
+Where files are referenced from some specific, well-known point in the filesystem.
 
-The following is a simple example configuration for a made up project:
+The following is an example configuration for a made up project:
 
 ```toml
 lib = "src/lib.rs"
 bin = "src/bin/hello.rs"
 ```
 
-The corresponding Rust struct could look like this:
+The corresponding Rust struct to deserialize it would look like this:
 
 ```rust
 #[derive(Deserialize)]

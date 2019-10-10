@@ -8,8 +8,6 @@
 //! following characteristics:
 //!
 //! * The path separator is set to a fixed character (`/`), regardless of platform.
-//! * The parent of a logical single component (like `foo`, `./foo`, and `foo/.`) is [`None`]
-//!   instead of `Some("")`.
 //! * Relative paths cannot represent a path in the filesystem, without first specifying what they
 //!   are relative to through [`to_path`].
 //!
@@ -250,7 +248,35 @@ impl<'a> Iterator for Components<'a> {
 
 impl<'a> DoubleEndedIterator for Components<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.next_back_component().map(|(s, _)| s)
+        if self.source.is_empty() {
+            return None;
+        }
+
+        let slice_end = self.source.len();
+
+        // strip suffixing separators
+        let end = scan_back(slice_end, self.source, scan_separator);
+
+        // find component
+        let start = scan_back(end, self.source, |a| a != SEP_BYTE);
+
+        // strip prefixing separator
+        let slice_start = scan_back(start, self.source, scan_separator);
+
+        let slice = &self.source[start..end];
+        self.source = &self.source[..slice_start];
+
+        if slice.is_empty() {
+            return None;
+        }
+
+        let slice = unsafe { ::std::str::from_utf8_unchecked(slice) };
+
+        match slice {
+            "." => Some(Component::CurDir),
+            ".." => Some(Component::ParentDir),
+            slice => Some(Component::Normal(slice)),
+        }
     }
 }
 
@@ -276,41 +302,6 @@ impl<'a> Components<'a> {
     /// ```
     pub fn as_relative_path(&self) -> &'a RelativePath {
         unsafe { RelativePath::from_u8_slice(self.source) }
-    }
-
-    /// Extracts the next back component and its length including separators.
-    fn next_back_component(&mut self) -> Option<(Component<'a>, usize)> {
-        if self.source.is_empty() {
-            return None;
-        }
-
-        let slice_end = self.source.len();
-
-        // strip suffixing separators
-        let end = scan_back(slice_end, self.source, scan_separator);
-
-        // find component
-        let start = scan_back(end, self.source, |a| a != SEP_BYTE);
-
-        // strip prefixing separator
-        let slice_start = scan_back(start, self.source, scan_separator);
-
-        let slice = &self.source[start..end];
-        self.source = &self.source[..slice_start];
-
-        if slice.is_empty() {
-            return None;
-        }
-
-        let slice = unsafe { ::std::str::from_utf8_unchecked(slice) };
-
-        let w = slice_end - slice_start;
-
-        match slice {
-            "." => Some((Component::CurDir, w)),
-            ".." => Some((Component::ParentDir, w)),
-            slice => Some((Component::Normal(slice), w)),
-        }
     }
 }
 
@@ -567,11 +558,7 @@ impl RelativePathBuf {
 
     /// Truncates `self` to [`self.parent`].
     ///
-    /// Returns `false` and does nothing if [`self.file_name`] is [`None`].
-    /// Otherwise, returns `true`.
-    ///
-    /// [`self.parent`]: PathBuf::parent
-    /// [`self.file_name`]: PathBuf::file_name
+    /// [`self.parent`]: RelativePathBuf::parent
     /// [`None`]: std::option::Option
     ///
     /// # Examples
@@ -583,8 +570,10 @@ impl RelativePathBuf {
     ///
     /// assert_eq!(true, p.pop());
     /// assert_eq!(RelativePath::new("test"), p);
+    /// assert_eq!(true, p.pop());
+    /// assert_eq!(RelativePath::new(""), p);
     /// assert_eq!(false, p.pop());
-    /// assert_eq!(RelativePath::new("test"), p);
+    /// assert_eq!(RelativePath::new(""), p);
     /// ```
     pub fn pop(&mut self) -> bool {
         match self.parent().map(|p| p.as_u8_slice().len()) {
@@ -893,33 +882,19 @@ impl RelativePath {
     /// use relative_path::RelativePath;
     ///
     /// assert_eq!(Some(RelativePath::new("foo")), RelativePath::new("foo/bar").parent());
-    /// assert_eq!(None, RelativePath::new("foo").parent());
+    /// assert_eq!(Some(RelativePath::new("")), RelativePath::new("foo").parent());
     /// assert_eq!(None, RelativePath::new("").parent());
     /// ```
     pub fn parent(&self) -> Option<&RelativePath> {
         use self::Component::*;
 
-        let mut it = self.components();
-
-        let mut n = 0;
-
-        while let Some((c, size)) = it.next_back_component() {
-            n += size;
-
-            if c == CurDir {
-                continue;
-            }
-
-            let slice = &self.inner[..self.inner.len() - n];
-
-            if slice.is_empty() {
-                return None;
-            }
-
-            return Some(RelativePath::new(slice));
+        if self.inner.is_empty() {
+            return None;
         }
 
-        None
+        let mut it = self.components();
+        while let Some(CurDir) = it.next_back() {}
+        Some(it.as_relative_path())
     }
 
     /// Returns the final component of the `RelativePath`, if there is one.
@@ -1533,7 +1508,7 @@ mod tests {
 
         t!("foo",
         iter: ["foo"],
-        parent: None,
+        parent: Some(""),
         file_name: Some("foo"),
         file_stem: Some("foo"),
         extension: None
@@ -1541,7 +1516,7 @@ mod tests {
 
         t!("/",
         iter: [],
-        parent: None,
+        parent: Some(""),
         file_name: None,
         file_stem: None,
         extension: None
@@ -1549,7 +1524,7 @@ mod tests {
 
         t!("/foo",
         iter: ["foo"],
-        parent: None,
+        parent: Some(""),
         file_name: Some("foo"),
         file_stem: Some("foo"),
         extension: None
@@ -1557,7 +1532,7 @@ mod tests {
 
         t!("foo/",
         iter: ["foo"],
-        parent: None,
+        parent: Some(""),
         file_name: Some("foo"),
         file_stem: Some("foo"),
         extension: None
@@ -1565,7 +1540,7 @@ mod tests {
 
         t!("/foo/",
         iter: ["foo"],
-        parent: None,
+        parent: Some(""),
         file_name: Some("foo"),
         file_stem: Some("foo"),
         extension: None
@@ -1589,7 +1564,7 @@ mod tests {
 
         t!("///foo///",
         iter: ["foo"],
-        parent: None,
+        parent: Some(""),
         file_name: Some("foo"),
         file_stem: Some("foo"),
         extension: None
@@ -1605,7 +1580,7 @@ mod tests {
 
         t!("./.",
         iter: [".", "."],
-        parent: None,
+        parent: Some(""),
         file_name: None,
         file_stem: None,
         extension: None
@@ -1613,7 +1588,7 @@ mod tests {
 
         t!("/..",
         iter: [".."],
-        parent: None,
+        parent: Some(""),
         file_name: None,
         file_stem: None,
         extension: None
@@ -1621,7 +1596,7 @@ mod tests {
 
         t!("../",
         iter: [".."],
-        parent: None,
+        parent: Some(""),
         file_name: None,
         file_stem: None,
         extension: None
@@ -1629,7 +1604,7 @@ mod tests {
 
         t!("foo/.",
         iter: ["foo", "."],
-        parent: None,
+        parent: Some(""),
         file_name: Some("foo"),
         file_stem: Some("foo"),
         extension: None
@@ -1645,7 +1620,7 @@ mod tests {
 
         t!("foo/./",
         iter: ["foo", "."],
-        parent: None,
+        parent: Some(""),
         file_name: Some("foo"),
         file_stem: Some("foo"),
         extension: None
@@ -1685,7 +1660,7 @@ mod tests {
 
         t!(".",
         iter: ["."],
-        parent: None,
+        parent: Some(""),
         file_name: None,
         file_stem: None,
         extension: None
@@ -1693,7 +1668,7 @@ mod tests {
 
         t!("./",
         iter: ["."],
-        parent: None,
+        parent: Some(""),
         file_name: None,
         file_stem: None,
         extension: None
@@ -1733,7 +1708,7 @@ mod tests {
 
         t!(".foo",
         iter: [".foo"],
-        parent: None,
+        parent: Some(""),
         file_name: Some(".foo"),
         file_stem: Some(".foo"),
         extension: None
@@ -2017,8 +1992,15 @@ mod tests {
             path.parent().and_then(RelativePath::parent)
         );
         assert_eq!(
+            Some(rp("")),
+            path.parent()
+                .and_then(RelativePath::parent)
+                .and_then(RelativePath::parent)
+        );
+        assert_eq!(
             None,
             path.parent()
+                .and_then(RelativePath::parent)
                 .and_then(RelativePath::parent)
                 .and_then(RelativePath::parent)
         );
@@ -2102,14 +2084,14 @@ mod tests {
         );
 
         tp!("", "", false);
-        tp!("/", "/", false);
-        tp!("foo", "foo", false);
-        tp!(".", ".", false);
-        tp!("/foo", "/foo", false);
+        tp!("/", "", true);
+        tp!("foo", "", true);
+        tp!(".", "", true);
+        tp!("/foo", "", true);
         tp!("/foo/bar", "/foo", true);
         tp!("/foo/bar/.", "/foo", true);
         tp!("foo/bar", "foo", true);
-        tp!("foo/.", "foo/.", false);
+        tp!("foo/.", "", true);
         tp!("foo//bar", "foo", true);
     }
 

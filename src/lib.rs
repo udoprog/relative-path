@@ -465,7 +465,7 @@ impl RelativePathBuf {
             &other.inner[..]
         };
 
-        if self.inner.len() > 0 && !self.ends_with_sep() {
+        if !self.inner.is_empty() && !self.ends_with_sep() {
             self.inner.push(SEP);
         }
 
@@ -507,11 +507,9 @@ impl RelativePathBuf {
     pub fn set_file_name<S: AsRef<str>>(&mut self, file_name: S) {
         let file_name = file_name.as_ref();
 
-        if self.file_name().is_some() {
-            if !self.pop() {
-                self.inner = file_name.to_string();
-                return;
-            }
+        if self.file_name().is_some() && !self.pop() {
+            self.inner = file_name.to_string();
+            return;
         }
 
         self.push(file_name);
@@ -733,9 +731,9 @@ impl RelativePath {
     ///     RelativePath::from_path("foo/bar")
     /// );
     /// ```
-    pub fn from_path<'a, P: ?Sized + AsRef<path::Path>>(
-        path: &'a P,
-    ) -> Result<&'a RelativePath, FromPathError> {
+    pub fn from_path<P: ?Sized + AsRef<path::Path>>(
+        path: &P,
+    ) -> Result<&RelativePath, FromPathError> {
         use std::path::Component::*;
 
         let other = path.as_ref();

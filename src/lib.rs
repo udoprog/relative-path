@@ -690,6 +690,7 @@ impl Hash for RelativePathBuf {
 }
 
 /// A borrowed, immutable relative path.
+#[repr(transparent)]
 pub struct RelativePath {
     inner: str,
 }

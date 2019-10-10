@@ -10,6 +10,7 @@ description = """
 Portable, relative paths for Rust.
 """
 readme = "README.md"
+edition = "2018"
 
 [features]
 default = []

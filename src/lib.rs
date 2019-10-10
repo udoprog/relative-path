@@ -67,10 +67,8 @@ use std::str;
 extern crate serde;
 
 const STEM_SEP: char = '.';
+const CURRENT_STR: &str = ".";
 const PARENT_STR: &str = "..";
-
-const CUR: char = '.';
-const CUR_BYTE: u8 = CUR as u8;
 
 const SEP: char = '/';
 const SEP_BYTE: u8 = SEP as u8;
@@ -80,9 +78,9 @@ const SEP_BYTE: u8 = SEP as u8;
 #[inline(always)]
 fn scan_back<P>(mut n: usize, s: &[u8], pattern: P) -> usize
 where
-    P: Fn(u8, Option<u8>) -> bool,
+    P: Fn(u8) -> bool,
 {
-    while n > 0 && pattern(s[n - 1], if n > 1 { Some(s[n - 2]) } else { None }) {
+    while n > 0 && pattern(s[n - 1]) {
         n -= 1;
     }
 
@@ -94,9 +92,9 @@ where
 #[inline(always)]
 fn scan_forward<P>(mut n: usize, s: &[u8], pattern: P) -> usize
 where
-    P: Fn(u8, Option<u8>) -> bool,
+    P: Fn(u8) -> bool,
 {
-    while n < s.len() && pattern(s[n], s.get(n + 1).cloned()) {
+    while n < s.len() && pattern(s[n]) {
         n += 1;
     }
 
@@ -108,8 +106,8 @@ where
 /// A separator is:
 /// * A slash (`/`).
 /// * A dot (`.`) immediately followed by a slash (`/`) or nothing (current directory).
-fn scan_separator(a: u8, b: Option<u8>) -> bool {
-    a == SEP_BYTE || a == CUR_BYTE && b.map(|c| c == SEP_BYTE).unwrap_or(true)
+fn scan_separator(a: u8) -> bool {
+    a == SEP_BYTE
 }
 
 fn split_file_at_dot(input: &str) -> (Option<&str>, Option<&str>) {
@@ -153,6 +151,7 @@ where
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Component<'a> {
+    CurDir,
     ParentDir,
     Normal(&'a str),
 }
@@ -167,7 +166,7 @@ impl<'a> Component<'a> {
     ///
     /// let path = RelativePath::new("./tmp/../foo/bar.txt");
     /// let components: Vec<_> = path.components().map(Component::as_str).collect();
-    /// assert_eq!(&components, &["tmp", "..", "foo", "bar.txt"]);
+    /// assert_eq!(&components, &[".", "tmp", "..", "foo", "bar.txt"]);
     /// ```
     ///
     /// [`str`]: str
@@ -175,6 +174,7 @@ impl<'a> Component<'a> {
         use self::Component::*;
 
         match self {
+            CurDir => CURRENT_STR,
             ParentDir => PARENT_STR,
             Normal(name) => name,
         }
@@ -194,6 +194,7 @@ where
 
     for c in components.into_iter() {
         match c {
+            CurDir => (),
             ParentDir => match stack.last() {
                 Some(&ParentDir) | None => {
                     stack.push(ParentDir);
@@ -225,7 +226,7 @@ impl<'a> Iterator for Components<'a> {
         let start = scan_forward(0usize, self.source, scan_separator);
 
         // collect component
-        let end = scan_forward(start, self.source, |a, _| a != SEP_BYTE);
+        let end = scan_forward(start, self.source, |a| a != SEP_BYTE);
 
         // strip suffixing separator
         let slice_end = scan_forward(end, self.source, scan_separator);
@@ -240,6 +241,7 @@ impl<'a> Iterator for Components<'a> {
         let slice = unsafe { ::std::str::from_utf8_unchecked(slice) };
 
         match slice {
+            "." => Some(Component::CurDir),
             ".." => Some(Component::ParentDir),
             slice => Some(Component::Normal(slice)),
         }
@@ -288,7 +290,7 @@ impl<'a> Components<'a> {
         let end = scan_back(slice_end, self.source, scan_separator);
 
         // find component
-        let start = scan_back(end, self.source, |a, _| a != SEP_BYTE);
+        let start = scan_back(end, self.source, |a| a != SEP_BYTE);
 
         // strip prefixing separator
         let slice_start = scan_back(start, self.source, scan_separator);
@@ -305,6 +307,7 @@ impl<'a> Components<'a> {
         let w = slice_end - slice_start;
 
         match slice {
+            "." => Some((Component::CurDir, w)),
             ".." => Some((Component::ParentDir, w)),
             slice => Some((Component::Normal(slice), w)),
         }
@@ -748,8 +751,8 @@ impl RelativePath {
         for (a, b) in other.components().zip(rel.components()) {
             match (a, b) {
                 (Prefix(_), _) | (RootDir, _) => return Err(FromPathErrorKind::NonRelative.into()),
-                (CurDir, Component::Normal(".")) => continue,
-                (ParentDir, Component::Normal("..")) => continue,
+                (CurDir, Component::CurDir) => continue,
+                (ParentDir, Component::ParentDir) => continue,
                 (Normal(a), Component::Normal(b)) if a == b => continue,
                 _ => return Err(FromPathErrorKind::BadSeparator.into()),
             }
@@ -896,17 +899,29 @@ impl RelativePath {
     /// assert_eq!(None, RelativePath::new("").parent());
     /// ```
     pub fn parent(&self) -> Option<&RelativePath> {
-        self.components()
-            .next_back_component()
-            .and_then(|(_, size)| {
-                let slice = &self.inner[..self.inner.len() - size];
+        use self::Component::*;
 
-                if slice.is_empty() {
-                    return None;
-                }
+        let mut it = self.components();
 
-                Some(RelativePath::new(slice))
-            })
+        let mut n = 0;
+
+        while let Some((c, size)) = it.next_back_component() {
+            n += size;
+
+            if c == CurDir {
+                continue;
+            }
+
+            let slice = &self.inner[..self.inner.len() - n];
+
+            if slice.is_empty() {
+                return None;
+            }
+
+            return Some(RelativePath::new(slice));
+        }
+
+        None
     }
 
     /// Returns the final component of the `RelativePath`, if there is one.
@@ -932,10 +947,19 @@ impl RelativePath {
     /// assert_eq!(None, RelativePath::new("/").file_name());
     /// ```
     pub fn file_name(&self) -> Option<&str> {
-        self.components().next_back().and_then(|c| match c {
-            Component::Normal(name) => Some(name),
-            _ => None,
-        })
+        use self::Component::*;
+
+        let mut it = self.components();
+
+        while let Some(c) = it.next_back() {
+            return match c {
+                CurDir => continue,
+                Normal(name) => Some(name),
+                _ => None,
+            };
+        }
+
+        None
     }
 
     /// Returns a relative path that, when joined onto `base`, yields `self`.
@@ -1582,7 +1606,7 @@ mod tests {
         );
 
         t!("./.",
-        iter: [],
+        iter: [".", "."],
         parent: None,
         file_name: None,
         file_stem: None,
@@ -1606,7 +1630,7 @@ mod tests {
         );
 
         t!("foo/.",
-        iter: ["foo"],
+        iter: ["foo", "."],
         parent: None,
         file_name: Some("foo"),
         file_stem: Some("foo"),
@@ -1622,7 +1646,7 @@ mod tests {
         );
 
         t!("foo/./",
-        iter: ["foo"],
+        iter: ["foo", "."],
         parent: None,
         file_name: Some("foo"),
         file_stem: Some("foo"),
@@ -1630,8 +1654,8 @@ mod tests {
         );
 
         t!("foo/./bar",
-        iter: ["foo", "bar"],
-        parent: Some("foo"),
+        iter: ["foo", ".", "bar"],
+        parent: Some("foo/."),
         file_name: Some("bar"),
         file_stem: Some("bar"),
         extension: None
@@ -1654,15 +1678,15 @@ mod tests {
         );
 
         t!("./a",
-        iter: ["a"],
-        parent: None,
+        iter: [".", "a"],
+        parent: Some("."),
         file_name: Some("a"),
         file_stem: Some("a"),
         extension: None
         );
 
         t!(".",
-        iter: [],
+        iter: ["."],
         parent: None,
         file_name: None,
         file_stem: None,
@@ -1670,7 +1694,7 @@ mod tests {
         );
 
         t!("./",
-        iter: [],
+        iter: ["."],
         parent: None,
         file_name: None,
         file_stem: None,
@@ -1694,8 +1718,8 @@ mod tests {
         );
 
         t!("a/./b",
-        iter: ["a", "b"],
-        parent: Some("a"),
+        iter: ["a", ".", "b"],
+        parent: Some("a/."),
         file_name: Some("b"),
         file_stem: Some("b"),
         extension: None
@@ -1989,9 +2013,9 @@ mod tests {
     fn test_parent() {
         let path = rp("baz/./bar/foo//./.");
 
-        assert_eq!(Some(rp("baz/bar")), path.parent());
+        assert_eq!(Some(rp("baz/./bar")), path.parent());
         assert_eq!(
-            Some(rp("baz")),
+            Some(rp("baz/.")),
             path.parent().and_then(RelativePath::parent)
         );
         assert_eq!(

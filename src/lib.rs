@@ -57,6 +57,7 @@ use std::cmp;
 use std::error;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::mem;
 use std::ops::{self, Deref};
 use std::path;
 use std::str;
@@ -69,44 +70,6 @@ const CURRENT_STR: &str = ".";
 const PARENT_STR: &str = "..";
 
 const SEP: char = '/';
-const SEP_BYTE: u8 = SEP as u8;
-
-/// Helper function to scan backwards, until the given `pattern` no longer matches or we run out of
-/// source to scan.
-#[inline(always)]
-fn scan_back<P>(mut n: usize, s: &[u8], pattern: P) -> usize
-where
-    P: Fn(u8) -> bool,
-{
-    while n > 0 && pattern(s[n - 1]) {
-        n -= 1;
-    }
-
-    n
-}
-
-/// Helper function to scan forwards, until the given `pattern` no longer matches or we run out of
-/// source to scan.
-#[inline(always)]
-fn scan_forward<P>(mut n: usize, s: &[u8], pattern: P) -> usize
-where
-    P: Fn(u8) -> bool,
-{
-    while n < s.len() && pattern(s[n]) {
-        n += 1;
-    }
-
-    n
-}
-
-/// Helper function to scan for separator.
-///
-/// A separator is:
-/// * A slash (`/`).
-/// * A dot (`.`) immediately followed by a slash (`/`) or nothing (current directory).
-fn scan_separator(a: u8) -> bool {
-    a == SEP_BYTE
-}
 
 fn split_file_at_dot(input: &str) -> (Option<&str>, Option<&str>) {
     if input == PARENT_STR {
@@ -190,7 +153,7 @@ where
 {
     use self::Component::*;
 
-    for c in components.into_iter() {
+    for c in components {
         match c {
             CurDir => (),
             ParentDir => match stack.last() {
@@ -209,36 +172,26 @@ where
 /// Iterator over all the components in a relative path.
 #[derive(Clone)]
 pub struct Components<'a> {
-    source: &'a [u8],
+    source: &'a str,
 }
 
 impl<'a> Iterator for Components<'a> {
     type Item = Component<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.source.is_empty() {
-            return None;
-        }
+        self.source = self.source.trim_start_matches(SEP);
 
-        // strip prefixing separators
-        let start = scan_forward(0usize, self.source, scan_separator);
-
-        // collect component
-        let end = scan_forward(start, self.source, |a| a != SEP_BYTE);
-
-        // strip suffixing separator
-        let slice_end = scan_forward(end, self.source, scan_separator);
-
-        let slice = &self.source[start..end];
-        self.source = &self.source[slice_end..];
-
-        if slice.is_empty() {
-            return None;
-        }
-
-        let slice = unsafe { ::std::str::from_utf8_unchecked(slice) };
+        let slice = match self.source.find(SEP) {
+            Some(i) => {
+                let (slice, rest) = self.source.split_at(i);
+                self.source = rest.trim_start_matches(SEP);
+                slice
+            }
+            None => mem::replace(&mut self.source, ""),
+        };
 
         match slice {
+            "" => None,
             "." => Some(Component::CurDir),
             ".." => Some(Component::ParentDir),
             slice => Some(Component::Normal(slice)),
@@ -248,31 +201,19 @@ impl<'a> Iterator for Components<'a> {
 
 impl<'a> DoubleEndedIterator for Components<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        if self.source.is_empty() {
-            return None;
-        }
+        self.source = self.source.trim_end_matches(SEP);
 
-        let slice_end = self.source.len();
-
-        // strip suffixing separators
-        let end = scan_back(slice_end, self.source, scan_separator);
-
-        // find component
-        let start = scan_back(end, self.source, |a| a != SEP_BYTE);
-
-        // strip prefixing separator
-        let slice_start = scan_back(start, self.source, scan_separator);
-
-        let slice = &self.source[start..end];
-        self.source = &self.source[..slice_start];
-
-        if slice.is_empty() {
-            return None;
-        }
-
-        let slice = unsafe { ::std::str::from_utf8_unchecked(slice) };
+        let slice = match self.source.rfind(SEP) {
+            Some(i) => {
+                let (rest, slice) = self.source.split_at(i + 1);
+                self.source = rest.trim_end_matches(SEP);
+                slice
+            }
+            None => mem::replace(&mut self.source, ""),
+        };
 
         match slice {
+            "" => None,
             "." => Some(Component::CurDir),
             ".." => Some(Component::ParentDir),
             slice => Some(Component::Normal(slice)),
@@ -281,10 +222,8 @@ impl<'a> DoubleEndedIterator for Components<'a> {
 }
 
 impl<'a> Components<'a> {
-    pub fn new(input: &str) -> Components {
-        Components {
-            source: input.as_bytes(),
-        }
+    pub fn new(source: &'a str) -> Components<'a> {
+        Self { source }
     }
 
     /// Extracts a slice corresponding to the portion of the path remaining for iteration.
@@ -301,7 +240,7 @@ impl<'a> Components<'a> {
     /// assert_eq!(RelativePath::new("bar.txt"), components.as_relative_path());
     /// ```
     pub fn as_relative_path(&self) -> &'a RelativePath {
-        unsafe { RelativePath::from_u8_slice(self.source) }
+        RelativePath::new(self.source)
     }
 }
 
@@ -426,10 +365,6 @@ impl RelativePathBuf {
         }
 
         Ok(buffer)
-    }
-
-    fn as_mut_vec(&mut self) -> &mut Vec<u8> {
-        unsafe { &mut *(self as *mut RelativePathBuf as *mut Vec<u8>) }
     }
 
     /// Extends `self` with `path`.
@@ -578,7 +513,7 @@ impl RelativePathBuf {
     pub fn pop(&mut self) -> bool {
         match self.parent().map(|p| p.as_u8_slice().len()) {
             Some(len) => {
-                self.as_mut_vec().truncate(len);
+                self.inner.truncate(len);
                 true
             }
             None => false,
@@ -746,12 +681,6 @@ impl RelativePath {
         }
 
         Ok(rel)
-    }
-
-    // The following (private!) function allows construction of a path from a u8
-    // slice, which is only safe when it is known to follow the str encoding.
-    unsafe fn from_u8_slice(s: &[u8]) -> &RelativePath {
-        RelativePath::new(str::from_utf8_unchecked(s))
     }
 
     // The following (private!) function reveals the byte encoding used for str.

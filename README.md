@@ -70,9 +70,3 @@ makes up legal file names.
 Windows has a number of [reserved characters][windows].
 
 [windows]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
-
-## TODO
-
- * Verify that relative paths are - indeed - portable.
- * Better function documentation with examples.
- * Support more `Path`-like functions.

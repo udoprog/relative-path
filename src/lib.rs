@@ -294,6 +294,13 @@ pub struct FromPathError {
     kind: FromPathErrorKind,
 }
 
+impl FromPathError {
+    /// Gets `FromPathErrorKind` that provides more details on what went wrong
+    pub fn kind(&self) -> FromPathErrorKind {
+        self.kind
+    }
+}
+
 impl From<FromPathErrorKind> for FromPathError {
     fn from(value: FromPathErrorKind) -> Self {
         Self { kind: value }

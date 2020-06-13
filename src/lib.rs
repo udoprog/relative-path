@@ -298,13 +298,13 @@ pub struct FromPathError {
 impl FromPathError {
     /// Gets the underlying [FromPathErrorKind] that provides more details on
     /// what went wrong.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust
     /// use std::path::Path;
     /// use relative_path::{FromPathErrorKind, RelativePathBuf};
-    /// 
+    ///
     /// let result = RelativePathBuf::from_path(Path::new("/hello/world"));
     /// let e = result.unwrap_err();
     ///
@@ -326,13 +326,14 @@ impl fmt::Display for FromPathError {
         match self.kind {
             FromPathErrorKind::NonRelative => "path contains non-relative component".fmt(fmt),
             FromPathErrorKind::NonUtf8 => "path contains non-utf8 component".fmt(fmt),
-            FromPathErrorKind::BadSeparator => "path contains platform-specific path separator".fmt(fmt),
+            FromPathErrorKind::BadSeparator => {
+                "path contains platform-specific path separator".fmt(fmt)
+            }
         }
     }
 }
 
-impl error::Error for FromPathError {
-}
+impl error::Error for FromPathError {}
 
 /// An owned, mutable relative path.
 ///

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2020-06-13
+
+### Added
+* Added `FromPathError::kind` to get more detailed error information ([#15]).
+
+### Changed
+* Marked `FromPathErrorKind` `#[non_exhaustive]` which technically is a breaking
+  change. But since it was not accessible from API code of this library, anyone
+  who used it outside are on their own.
+
 ## [1.1.1] - 2020-06-13
 
 ### Changed
@@ -17,8 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 * Added `RelativePath::relative` to render a path relative from one path to another ([#14]).
 
+[#15]: https://github.com/udoprog/relative-path/pull/15
 [#14]: https://github.com/udoprog/relative-path/pull/14
 
-[Unreleased]: https://github.com/udoprog/relative-path/compare/1.1.1...master
+[Unreleased]: https://github.com/udoprog/relative-path/compare/1.2.0...master
+[1.2.0]: https://github.com/udoprog/relative-path/compare/1.1.1...1.2.0
 [1.1.1]: https://github.com/udoprog/relative-path/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/udoprog/relative-path/compare/1.0.0...1.1.0

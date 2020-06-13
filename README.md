@@ -1,9 +1,9 @@
+[![Build Status](https://github.com/udoprog/relative-path/workflows/Rust/badge.svg)](https://github.com/udoprog/relative-path/actions)
+[![crates.io](https://img.shields.io/crates/v/relative-path.svg?maxAge=2592000)](https://crates.io/crates/relative-path)
+
 # relative-path
 
 Portable, relative paths for Rust.
-
-[![Build Status](https://api.travis-ci.org/udoprog/relative-path.svg?branch=master)](https://travis-ci.org/udoprog/relative-path)
-[![Build status](https://ci.appveyor.com/api/projects/status/x2spyavt5fe6lbeq?svg=true)](https://ci.appveyor.com/project/udoprog/relative-path/branch/master)
 
 [Documentation](https://docs.rs/relative-path)
 

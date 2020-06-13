@@ -147,7 +147,7 @@ impl<'a> Component<'a> {
 /// This takes '.', and '..' into account. Where '.' doesn't change the stack, and '..' pops the
 /// last item or further adds parent components.
 #[inline(always)]
-fn relative_traversal<'a, C>(stack: &mut Vec<Component<'a>>, components: C)
+fn relative_traversal<'a, C>(stack: &mut Vec<&'a str>, components: C)
 where
     C: IntoIterator<Item = Component<'a>>,
 {
@@ -156,15 +156,15 @@ where
     for c in components {
         match c {
             CurDir => (),
-            ParentDir => match stack.last() {
-                Some(&ParentDir) | None => {
-                    stack.push(ParentDir);
+            ParentDir => match stack.last().copied() {
+                Some(PARENT_STR) | None => {
+                    stack.push(PARENT_STR);
                 }
                 _ => {
                     stack.pop();
                 }
             },
-            Normal(name) => stack.push(Normal(name)),
+            Normal(name) => stack.push(name),
         }
     }
 }
@@ -1054,12 +1054,7 @@ impl RelativePath {
         let mut stack = Vec::new();
         relative_traversal(&mut stack, self.components());
         relative_traversal(&mut stack, path.as_ref().components());
-        let string = stack
-            .into_iter()
-            .map(|c| c.as_str())
-            .collect::<Vec<_>>()
-            .join("/");
-        RelativePathBuf::from(string)
+        RelativePathBuf::from(stack.join("/"))
     }
 
     /// Return an owned `RelativePathBuf`, with all non-normal components moved to the beginning of
@@ -1088,12 +1083,88 @@ impl RelativePath {
     pub fn normalize(&self) -> RelativePathBuf {
         let mut stack = Vec::new();
         relative_traversal(&mut stack, self.components());
-        let string = stack
-            .into_iter()
-            .map(|c| c.as_str())
-            .collect::<Vec<_>>()
-            .join("/");
-        RelativePathBuf::from(string)
+        RelativePathBuf::from(stack.join("/"))
+    }
+
+    /// Constructs a relative path from the current path, to `path`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    ///
+    /// assert_eq!(
+    ///     "../../e/f",
+    ///     RelativePath::new("a/b/c/d").relative(RelativePath::new("a/b/e/f"))
+    /// );
+    ///
+    /// assert_eq!(
+    ///     "../bbb",
+    ///     RelativePath::new("a/../aaa").relative(RelativePath::new("b/../bbb"))
+    /// );
+    ///
+    /// let p = RelativePath::new("git/relative-path");
+    /// let r = RelativePath::new("git");
+    /// assert_eq!("relative-path", r.relative(p));
+    /// assert_eq!("..", p.relative(r));
+    ///
+    /// let p = RelativePath::new("../../git/relative-path");
+    /// let r = RelativePath::new("git");
+    /// assert_eq!("../../../git/relative-path", r.relative(p));
+    /// assert_eq!("", p.relative(r));
+    ///
+    /// let a = RelativePath::new("foo/bar/bap/foo.h");
+    /// let b = RelativePath::new("../arch/foo.h");
+    /// assert_eq!("../../../../../arch/foo.h", a.relative(b));
+    /// assert_eq!("", b.relative(a));
+    /// ```
+    pub fn relative<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
+        let mut from = Vec::new();
+        let mut to = Vec::new();
+
+        relative_traversal(&mut from, self.components());
+        relative_traversal(&mut to, path.as_ref().components());
+
+        // Special case: The path we are traversing from can't contain unnamed
+        // components. A relative path might be any path, like `/`, or
+        // `/foo/bar/baz`, and these components cannot be named in the relative
+        // traversal.
+        //
+        // Also note that `relative_traversal` guarantees that all ParentDir
+        // components are at the head of the stack.
+        if !from.is_empty() && from[0] == PARENT_STR {
+            return RelativePathBuf::new();
+        }
+
+        let mut from = from.into_iter();
+        let mut to = to.into_iter();
+
+        // keep track of the last component tracked in to, since we need to
+        // append it after we've identified common components.
+        let tail;
+
+        let mut buffer = RelativePathBuf::new();
+
+        // strip common prefixes
+        loop {
+            match (from.next(), to.next()) {
+                (Some(from), Some(to)) if from == to => continue,
+                (from, to) => {
+                    if from.is_some() {
+                        buffer.push(PARENT_STR);
+                    }
+
+                    tail = to;
+                    break;
+                }
+            }
+        }
+
+        for c in from.map(|_| PARENT_STR).chain(tail).chain(to) {
+            buffer.push(c);
+        }
+
+        buffer
     }
 
     /// Check if path starts with a path separator.

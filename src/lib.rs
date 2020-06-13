@@ -302,20 +302,15 @@ impl From<FromPathErrorKind> for FromPathError {
 
 impl fmt::Display for FromPathError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        <Self as error::Error>::description(self).fmt(fmt)
+        match self.kind {
+            FromPathErrorKind::NonRelative => "path contains non-relative component".fmt(fmt),
+            FromPathErrorKind::NonUtf8 => "path contains non-utf8 component".fmt(fmt),
+            FromPathErrorKind::BadSeparator => "path contains platform-specific path separator".fmt(fmt),
+        }
     }
 }
 
 impl error::Error for FromPathError {
-    fn description(&self) -> &str {
-        use self::FromPathErrorKind::*;
-
-        match self.kind {
-            NonRelative => "path contains non-relative component",
-            NonUtf8 => "path contains non-utf8 component",
-            BadSeparator => "path contains platform-specific path separator",
-        }
-    }
 }
 
 /// An owned, mutable relative path.

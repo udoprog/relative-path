@@ -278,7 +278,8 @@ impl<'a> DoubleEndedIterator for Iter<'a> {
     }
 }
 
-#[derive(Copy, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FromPathErrorKind {
     /// Non-relative component in path.
     NonRelative,
@@ -295,7 +296,20 @@ pub struct FromPathError {
 }
 
 impl FromPathError {
-    /// Gets `FromPathErrorKind` that provides more details on what went wrong
+    /// Gets the underlying [FromPathErrorKind] that provides more details on
+    /// what went wrong.
+    /// 
+    /// # Examples
+    /// 
+    /// ```rust
+    /// use std::path::Path;
+    /// use relative_path::{FromPathErrorKind, RelativePathBuf};
+    /// 
+    /// let result = RelativePathBuf::from_path(Path::new("/hello/world"));
+    /// let e = result.unwrap_err();
+    ///
+    /// assert_eq!(FromPathErrorKind::NonRelative, e.kind());
+    /// ```
     pub fn kind(&self) -> FromPathErrorKind {
         self.kind
     }

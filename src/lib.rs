@@ -91,11 +91,10 @@ fn split_file_at_dot(input: &str) -> (Option<&str>, Option<&str>) {
 // Iterate through `iter` while it matches `prefix`; return `None` if `prefix`
 // is not a prefix of `iter`, otherwise return `Some(iter_after_prefix)` giving
 // `iter` after having exhausted `prefix`.
-fn iter_after<A, I, J>(mut iter: I, mut prefix: J) -> Option<I>
+fn iter_after<'a, 'b, I, J>(mut iter: I, mut prefix: J) -> Option<I>
 where
-    I: Iterator<Item = A> + Clone,
-    J: Iterator<Item = A>,
-    A: PartialEq,
+    I: Iterator<Item = Component<'a>> + Clone,
+    J: Iterator<Item = Component<'b>>,
 {
     loop {
         let mut iter_next = iter.clone();
@@ -902,13 +901,10 @@ impl RelativePath {
     /// assert_eq!(path.strip_prefix("test").is_ok(), true);
     /// assert_eq!(path.strip_prefix("haha").is_ok(), false);
     /// ```
-    pub fn strip_prefix<'a, P: ?Sized>(
-        &'a self,
-        base: &'a P,
-    ) -> Result<&'a RelativePath, StripPrefixError>
-    where
-        P: AsRef<RelativePath>,
-    {
+    pub fn strip_prefix<P: AsRef<RelativePath>>(
+        &self,
+        base: P,
+    ) -> Result<&RelativePath, StripPrefixError> {
         iter_after(self.components(), base.as_ref().components())
             .map(|c| c.as_relative_path())
             .ok_or(StripPrefixError(()))

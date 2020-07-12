@@ -1,10 +1,10 @@
 //! Portable relative UTF-8 paths for Rust.
 //!
-//! This provide a module analogous to [`std::path`], with the following characteristics:
+//! This provide a module analogous to [std::path], with the following characteristics:
 //!
 //! * The path separator is set to a fixed character (`/`), regardless of platform.
 //! * Relative paths cannot represent a path in the filesystem without first specifying what they
-//!   are *relative to* through [`to_path`].
+//!   are *relative to* through [to_path].
 //! * Relative paths are always guaranteed to be a UTF-8 string.
 //!
 //! On top of this we support many path-like operations that guarantee portable behavior.
@@ -44,11 +44,11 @@
 //! Assuming `"C:\\path\\to\\source"` is a legal path on Windows, this will
 //! happily run for one platform when checked into source control but not others.
 //!
-//! Since [`RelativePath`] strictly uses `/` as a separator it avoids this issue.
+//! Since [RelativePath] strictly uses `/` as a separator it avoids this issue.
 //! Anything non-slash will simply be considered part of a *distinct component*.
 //!
-//! Conversion to [`Path`] may only happen if it is known which path it is relative to through the
-//! [`to_path`] function. This is where the relative part of the name comes from.
+//! Conversion to [Path] may only happen if it is known which path it is relative to through the
+//! [to_path] function. This is where the relative part of the name comes from.
 //!
 //! ```rust
 //! use relative_path::RelativePath;
@@ -107,7 +107,7 @@
 //! assert_eq!(2, RelativePath::new("foo/bar").components().count());
 //! ```
 //!
-//! To see if two relative paths are equivalent you can use [`normalize`]:
+//! To see if two relative paths are equivalent you can use [normalize]:
 //!
 //! ```rust
 //! use relative_path::RelativePath;
@@ -126,7 +126,7 @@
 //! This section tries to document additional portability issues that we know
 //! about.
 //!
-//! [`RelativePath`], similarly to [`Path`], makes no guarantees that the components represented in them
+//! [RelativePath], similarly to [Path], makes no guarantees that the components represented in them
 //! makes up legal file names.
 //! While components are strictly separated by slashes, we can still store things in path components which may not be used as legal paths on all platforms.
 //!
@@ -165,12 +165,12 @@
 //! compatible relative path *also* exists.
 //!
 //! [windows-reserved]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
-//! [`RelativePath`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html
-//! [`to_path`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path
-//! [`normalize`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.normalize
-//! [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html
-//! [`std::path`]: https://doc.rust-lang.org/std/path/index.html
-//! [`Path`]: https://doc.rust-lang.org/std/path/struct.Path.html
+//! [RelativePath]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html
+//! [to_path]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path
+//! [normalize]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.normalize
+//! [None]: https://doc.rust-lang.org/std/option/enum.Option.html
+//! [std::path]: https://doc.rust-lang.org/std/path/index.html
+//! [Path]: https://doc.rust-lang.org/std/path/struct.Path.html
 
 // This file contains parts that are Copyright 2015 The Rust Project Developers, copied from:
 // https://github.com/rust-lang/rust
@@ -267,7 +267,7 @@ pub enum Component<'a> {
 }
 
 impl<'a> Component<'a> {
-    /// Extracts the underlying [`str`] slice.
+    /// Extracts the underlying [str] slice.
     ///
     /// # Examples
     ///
@@ -279,7 +279,7 @@ impl<'a> Component<'a> {
     /// assert_eq!(&components, &[".", "tmp", "..", "foo", "bar.txt"]);
     /// ```
     ///
-    /// [`str`]: str
+    /// [str]: https://doc.rust-lang.org/std/primitive.str.html
     pub fn as_str(self) -> &'a str {
         use self::Component::*;
 
@@ -387,7 +387,7 @@ impl<'a> Components<'a> {
     /// components.next();
     /// components.next();
     ///
-    /// assert_eq!(RelativePath::new("bar.txt"), components.as_relative_path());
+    /// assert_eq!("bar.txt", components.as_relative_path());
     /// ```
     pub fn as_relative_path(&self) -> &'a RelativePath {
         RelativePath::new(self.source)
@@ -400,15 +400,12 @@ impl<'a> cmp::PartialEq for Components<'a> {
     }
 }
 
-/// An iterator over the [`Component`]s of a [`RelativePath`], as [`str`] slices.
+/// An iterator over the [Component]s of a [RelativePath], as [str] slices.
 ///
-/// This `struct` is created by the [`iter`] method on [`RelativePath`].
-/// See its documentation for more.
+/// This `struct` is created by the [iter] method.
 ///
-/// [`Component`]: Component
-/// [`iter`]: struct.RelativePath.html#method.iter
-/// [`str`]: str
-/// [`RelativePath`]: struct.RelativePath.html
+/// [iter]: RelativePath::iter
+/// [str]: https://doc.rust-lang.org/std/primitive.str.html
 #[derive(Clone)]
 pub struct Iter<'a> {
     inner: Components<'a>,
@@ -502,9 +499,9 @@ impl RelativePathBuf {
         }
     }
 
-    /// Try to convert a [`Path`] to a `RelativePathBuf`.
+    /// Try to convert a [Path] to a [RelativePathBuf].
     ///
-    /// [`Path`]: std::path::Path
+    /// [Path]: https://doc.rust-lang.org/std/path/struct.Path.html
     ///
     /// # Examples
     ///
@@ -566,18 +563,18 @@ impl RelativePathBuf {
         self.inner.push_str(other)
     }
 
-    /// Updates [`self.file_name`] to `file_name`.
+    /// Updates [file_name] to `file_name`.
     ///
-    /// If [`self.file_name`] was [`None`], this is equivalent to pushing
+    /// If [file_name] was [None], this is equivalent to pushing
     /// `file_name`.
     ///
-    /// Otherwise it is equivalent to calling [`pop`] and then pushing
+    /// Otherwise it is equivalent to calling [pop] and then pushing
     /// `file_name`. The new path will be a sibling of the original path.
     /// (That is, it will have the same parent.)
     ///
-    /// [`self.file_name`]: struct.RelativePathBuf.html#method.file_name
-    /// [`pop`]: struct.RelativePathBuf.html#method.pop
-    /// [`None`]: std::option::Option
+    /// [file_name]: RelativePath::file_name
+    /// [pop]: RelativePathBuf::pop
+    /// [None]: https://doc.rust-lang.org/std/option/enum.Option.html
     ///
     /// # Examples
     ///
@@ -609,17 +606,17 @@ impl RelativePathBuf {
         self.push(file_name);
     }
 
-    /// Updates [`self.extension`] to `extension`.
+    /// Updates [extension] to `extension`.
     ///
-    /// Returns `false` and does nothing if [`self.file_name`] is [`None`],
+    /// Returns `false` and does nothing if [file_name] is [None],
     /// returns `true` and updates the extension otherwise.
     ///
-    /// If [`self.extension`] is [`None`], the extension is added; otherwise
+    /// If [extension] is [None], the extension is added; otherwise
     /// it is replaced.
     ///
-    /// [`self.file_name`]: struct.RelativePathBuf.html#method.file_name
-    /// [`self.extension`]: struct.RelativePathBuf.html#method.extension
-    /// [`None`]: std::option::Option
+    /// [file_name]: RelativePath::file_name
+    /// [extension]: RelativePath::extension
+    /// [None]: https://doc.rust-lang.org/std/option/enum.Option.html
     ///
     /// # Examples
     ///
@@ -659,10 +656,9 @@ impl RelativePathBuf {
         true
     }
 
-    /// Truncates `self` to [`self.parent`].
+    /// Truncates `self` to [parent].
     ///
-    /// [`self.parent`]: RelativePathBuf::parent
-    /// [`None`]: std::option::Option
+    /// [parent]: RelativePath::parent
     ///
     /// # Examples
     ///
@@ -688,9 +684,7 @@ impl RelativePathBuf {
         }
     }
 
-    /// Coerce to a [`RelativePath`] slice.
-    ///
-    /// [`RelativePath`]: RelativePath
+    /// Coerce to a [RelativePath] slice.
     pub fn as_relative_path(&self) -> &RelativePath {
         self
     }
@@ -788,14 +782,9 @@ pub struct RelativePath {
     inner: str,
 }
 
-/// An error returned from [`RelativePath::strip_prefix`][`strip_prefix`] if the prefix
-/// was not found.
+/// An error returned from [strip_prefix] if the prefix was not found.
 ///
-/// This `struct` is created by the [`strip_prefix`] method on [`RelativePath`].
-/// See its documentation for more.
-///
-/// [`strip_prefix`]: struct.RelativePath.html#method.strip_prefix
-/// [`RelativePath`]: RelativePath
+/// [strip_prefix]: RelativePath::strip_prefix
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StripPrefixError(());
 
@@ -805,11 +794,16 @@ impl RelativePath {
         unsafe { &*(s.as_ref() as *const str as *const RelativePath) }
     }
 
-    /// Try to convert a [`Path`] to a `RelativePath` without allocating a buffer.
+    /// Try to convert a [Path] to a [RelativePath] without allocating a buffer.
     ///
-    /// This requires the Path to be a legal, platform-neutral relative path.
+    /// [Path]: https://doc.rust-lang.org/std/path/struct.Path.html
     ///
-    /// [`Path`]: std::path::Path
+    /// # Errors
+    ///
+    /// This requires the path to be a legal, platform-neutral relative path.
+    /// Otherwise various forms of [FromPathError] will be returned as an [Err].
+    ///
+    /// [Err]: https://doc.rust-lang.org/std/result/enum.Result.html
     ///
     /// # Examples
     ///
@@ -869,7 +863,9 @@ impl RelativePath {
         &self.inner
     }
 
-    /// Returns an object that implements [`Display`].
+    /// Returns an object that implements [Display].
+    ///
+    /// [Display]: https://doc.rust-lang.org/std/fmt/trait.Display.html
     ///
     /// # Examples
     ///
@@ -885,9 +881,7 @@ impl RelativePath {
         Display { path: self }
     }
 
-    /// Creates an owned [`RelativePathBuf`] with path adjoined to self.
-    ///
-    /// [`RelativePathBuf`]: RelativePathBuf
+    /// Creates an owned [RelativePathBuf] with path adjoined to self.
     ///
     /// # Examples
     ///
@@ -922,14 +916,13 @@ impl RelativePath {
         Components::new(&self.inner)
     }
 
-    /// Produces an iterator over the path's components viewed as [`str`]
-    /// slices.
+    /// Produces an iterator over the path's components viewed as [str] slices.
     ///
     /// For more information about the particulars of how the path is separated
-    /// into components, see [`components`].
+    /// into components, see [components].
     ///
-    /// [`components`]: #method.components
-    /// [`str`]: str
+    /// [components]: Self::components
+    /// [str]: https://doc.rust-lang.org/std/primitive.str.html
     ///
     /// # Examples
     ///
@@ -947,14 +940,12 @@ impl RelativePath {
         }
     }
 
-    /// Convert to an owned [`RelativePathBuf`].
-    ///
-    /// [`RelativePathBuf`]: RelativePathBuf
+    /// Convert to an owned [RelativePathBuf].
     pub fn to_relative_path_buf(&self) -> RelativePathBuf {
         RelativePathBuf::from(self.inner.to_string())
     }
 
-    /// Build an owned `PathBuf` relative to `relative_to` for the current relative path.
+    /// Build an owned [PathBuf] relative to `relative_to` for the current relative path.
     ///
     /// # Examples
     ///
@@ -1002,6 +993,9 @@ impl RelativePath {
     ///     );
     /// }
     /// ```
+    ///
+    /// [PathBuf]: https://doc.rust-lang.org/std/path/struct.PathBuf.html
+    /// [PathBuf::push]: https://doc.rust-lang.org/std/path/struct.PathBuf.html#method.push
     pub fn to_path<P: AsRef<path::Path>>(&self, relative_to: P) -> path::PathBuf {
         let mut p = relative_to.as_ref().to_path_buf().into_os_string();
 
@@ -1013,7 +1007,7 @@ impl RelativePath {
         path::PathBuf::from(p)
     }
 
-    /// Returns a relative path, without its final component if there is one.
+    /// Returns a relative path, without its final [Component] if there is one.
     ///
     /// # Examples
     ///
@@ -1041,9 +1035,9 @@ impl RelativePath {
     /// If the path is a normal file, this is the file name. If it's the path of a directory, this
     /// is the directory name.
     ///
-    /// Returns [`None`] If the path terminates in `..`.
+    /// Returns [None] If the path terminates in `..`.
     ///
-    /// [`None`]: std::option::Option
+    /// [None]: https://doc.rust-lang.org/std/option/enum.Option.html
     ///
     /// # Examples
     ///
@@ -1078,11 +1072,11 @@ impl RelativePath {
     ///
     /// # Errors
     ///
-    /// If `base` is not a prefix of `self` (i.e. [`starts_with`]
-    /// returns `false`), returns [`Err`].
+    /// If `base` is not a prefix of `self` (i.e. [starts_with]
+    /// returns `false`), returns [Err].
     ///
-    /// [`starts_with`]: #method.starts_with
-    /// [`Err`]: std::result::Result
+    /// [starts_with]: Self::starts_with
+    /// [Err]: https://doc.rust-lang.org/std/result/enum.Result.html
     ///
     /// # Examples
     ///
@@ -1140,12 +1134,11 @@ impl RelativePath {
         iter_after(self.components().rev(), child.as_ref().components().rev()).is_some()
     }
 
-    /// Creates an owned [`RelativePathBuf`] like `self` but with the given file name.
+    /// Creates an owned [RelativePathBuf] like `self` but with the given file name.
     ///
-    /// See [`RelativePathBuf::set_file_name`] for more details.
+    /// See [set_file_name] for more details.
     ///
-    /// [`RelativePathBuf`]: RelativePathBuf
-    /// [`RelativePathBuf::set_file_name`]: struct.RelativePathBuf.html#method.set_file_name
+    /// [set_file_name]: RelativePathBuf::set_file_name
     ///
     /// # Examples
     ///
@@ -1164,18 +1157,18 @@ impl RelativePath {
         buf
     }
 
-    /// Extracts the stem (non-extension) portion of [`self.file_name`].
+    /// Extracts the stem (non-extension) portion of [file_name].
     ///
-    /// [`self.file_name`]: struct.RelativePath.html#method.file_name
+    /// [file_name]: Self::file_name
     ///
     /// The stem is:
     ///
-    /// * [`None`], if there is no file name;
+    /// * [None], if there is no file name;
     /// * The entire file name if there is no embedded `.`;
     /// * The entire file name if the file name begins with `.` and has no other `.`s within;
     /// * Otherwise, the portion of the file name before the final `.`
     ///
-    /// [`None`]: std::option::Option
+    /// [None]: https://doc.rust-lang.org/std/option/enum.Option.html
     ///
     /// # Examples
     ///
@@ -1192,17 +1185,17 @@ impl RelativePath {
             .and_then(|(before, after)| before.or(after))
     }
 
-    /// Extracts the extension of [`self.file_name`], if possible.
+    /// Extracts the extension of [file_name], if possible.
     ///
     /// The extension is:
     ///
-    /// * [`None`], if there is no file name;
-    /// * [`None`], if there is no embedded `.`;
-    /// * [`None`], if the file name begins with `.` and has no other `.`s within;
+    /// * [None], if there is no file name;
+    /// * [None], if there is no embedded `.`;
+    /// * [None], if the file name begins with `.` and has no other `.`s within;
     /// * Otherwise, the portion of the file name after the final `.`
     ///
-    /// [`self.file_name`]: struct.RelativePath.html#method.file_name
-    /// [`None`]: std::option::Option
+    /// [file_name]: Self::file_name
+    /// [None]: https://doc.rust-lang.org/std/option/enum.Option.html
     ///
     /// # Examples
     ///
@@ -1219,12 +1212,11 @@ impl RelativePath {
             .and_then(|(before, after)| before.and(after))
     }
 
-    /// Creates an owned [`RelativePathBuf`] like `self` but with the given extension.
+    /// Creates an owned [RelativePathBuf] like `self` but with the given extension.
     ///
-    /// See [`RelativePathBuf::set_extension`] for more details.
+    /// See [set_extension] for more details.
     ///
-    /// [`RelativePathBuf`]: RelativePathBuf
-    /// [`RelativePathBuf::set_extension`]: struct.RelativePathBuf.html#method.set_extension
+    /// [set_extension]: RelativePathBuf::set_extension
     ///
     /// # Examples
     ///
@@ -1240,7 +1232,7 @@ impl RelativePath {
         buf
     }
 
-    /// Build an owned `RelativePathBuf`, joined with the given path and normalized.
+    /// Build an owned [RelativePathBuf], joined with the given path and normalized.
     ///
     /// # Examples
     ///
@@ -1264,7 +1256,7 @@ impl RelativePath {
         RelativePathBuf::from(stack.join("/"))
     }
 
-    /// Return an owned `RelativePathBuf`, with all non-normal components moved to the beginning of
+    /// Return an owned [RelativePathBuf], with all non-normal components moved to the beginning of
     /// the path.
     ///
     /// This permits for a normalized representation of different relative components.
@@ -1283,8 +1275,13 @@ impl RelativePath {
     /// use relative_path::RelativePath;
     ///
     /// assert_eq!(
-    ///     RelativePath::new("../foo/baz.txt"),
-    ///     RelativePath::new("../foo/./bar/../baz.txt").normalize().as_relative_path()
+    ///     "../foo/baz.txt",
+    ///     RelativePath::new("../foo/./bar/../baz.txt").normalize()
+    /// );
+    ///
+    /// assert_eq!(
+    ///     "",
+    ///     RelativePath::new(".").normalize()
     /// );
     /// ```
     pub fn normalize(&self) -> RelativePathBuf {
@@ -1465,12 +1462,12 @@ impl fmt::Display for RelativePathBuf {
 
 /// Helper struct for printing relative paths.
 ///
-/// This is not strictly necessary in the same sense as it is for [`std::path::Display`], because
-/// relative paths are guaranteed to be valid unicode. But the behavior is preserved to simplify
-/// the transition between [`std::path::Path`] and [`RelativePath`].
+/// This is not strictly necessary in the same sense as it is for [Display],
+/// because relative paths are guaranteed to be valid UTF-8. But the behavior
+/// is preserved to simplify the transition between [Path] and [RelativePath].
 ///
-/// [`std::path::Display`]: std::path::Display
-/// [`RelativePath`]: RelativePath
+/// [Path]: https://doc.rust-lang.org/std/path/struct.Path.html
+/// [Display]: https://doc.rust-lang.org/std/fmt/trait.Display.html
 pub struct Display<'a> {
     path: &'a RelativePath,
 }

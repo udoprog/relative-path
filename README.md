@@ -7,11 +7,11 @@
 
 Portable relative UTF-8 paths for Rust.
 
-This provide a module analogous to [`std::path`], with the following characteristics:
+This provide a module analogous to [std::path], with the following characteristics:
 
 * The path separator is set to a fixed character (`/`), regardless of platform.
 * Relative paths cannot represent a path in the filesystem without first specifying what they
-  are *relative to* through [`to_path`].
+  are *relative to* through [to_path].
 * Relative paths are always guaranteed to be a UTF-8 string.
 
 On top of this we support many path-like operations that guarantee portable behavior.
@@ -51,11 +51,11 @@ source = "C:\\path\\to\\source"
 Assuming `"C:\\path\\to\\source"` is a legal path on Windows, this will
 happily run for one platform when checked into source control but not others.
 
-Since [`RelativePath`] strictly uses `/` as a separator it avoids this issue.
+Since [RelativePath] strictly uses `/` as a separator it avoids this issue.
 Anything non-slash will simply be considered part of a *distinct component*.
 
-Conversion to [`Path`] may only happen if it is known which path it is relative to through the
-[`to_path`] function. This is where the relative part of the name comes from.
+Conversion to [Path] may only happen if it is known which path it is relative to through the
+[to_path] function. This is where the relative part of the name comes from.
 
 ```rust
 use relative_path::RelativePath;
@@ -114,7 +114,7 @@ assert_eq!(1, RelativePath::new("foo\\bar").components().count());
 assert_eq!(2, RelativePath::new("foo/bar").components().count());
 ```
 
-To see if two relative paths are equivalent you can use [`normalize`]:
+To see if two relative paths are equivalent you can use [normalize]:
 
 ```rust
 use relative_path::RelativePath;
@@ -133,7 +133,7 @@ We do not avoid all.
 This section tries to document additional portability issues that we know
 about.
 
-[`RelativePath`], similarly to [`Path`], makes no guarantees that the components represented in them
+[RelativePath], similarly to [Path], makes no guarantees that the components represented in them
 makes up legal file names.
 While components are strictly separated by slashes, we can still store things in path components which may not be used as legal paths on all platforms.
 
@@ -172,9 +172,9 @@ The hope is that it will be more probable to cause an early error unless a
 compatible relative path *also* exists.
 
 [windows-reserved]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
-[`RelativePath`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html
-[`to_path`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path
-[`normalize`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.normalize
-[`None`]: https://doc.rust-lang.org/std/option/enum.Option.html
-[`std::path`]: https://doc.rust-lang.org/std/path/index.html
-[`Path`]: https://doc.rust-lang.org/std/path/struct.Path.html
+[RelativePath]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html
+[to_path]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path
+[normalize]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.normalize
+[None]: https://doc.rust-lang.org/std/option/enum.Option.html
+[std::path]: https://doc.rust-lang.org/std/path/index.html
+[Path]: https://doc.rust-lang.org/std/path/struct.Path.html

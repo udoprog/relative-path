@@ -134,9 +134,35 @@
 //! (`/`) is also used as a path separator.
 //! * Windows has a number of [reserved characters and names][windows-reserved].
 //!
-//! As a relative path is converted, it's simply performed as a series of [`Path::push`] calls, one for each component.
-//! This can cause varying results for each platform - i.e. a component containing a backslash on Windows would be seen as two separate components once converted.
-//! This highlights the need to perform as many operations on relative paths as possible, rather then converting them first to their [`std::path`] equivalents.
+//! As a relative path that *actually* contains a platform-specific absolute path
+//! will result in a nonsensical path being generated.
+//!
+//! ```rust
+//! use relative_path::RelativePath;
+//! use std::path::Path;
+//!
+//! if cfg!(windows) {
+//!     assert_eq!(
+//!         Path::new("foo\\c:\\bar\\baz"),
+//!         RelativePath::new("c:\\bar\\baz").to_path("foo")
+//!     );
+//! }
+//!
+//! if cfg!(unix) {
+//!     assert_eq!(
+//!         Path::new("foo/bar/baz"),
+//!         RelativePath::new("/bar/baz").to_path("foo")
+//!     );
+//! }
+//! ```
+//!
+//! This is intentional in order to cause an early breakage when a platform
+//! encounters paths like `"foo/c:\\bar\\baz"` to signal that it is a
+//! portability hazard.
+//! On Unix it's a bit more subtle with `""foo/bar/baz""`, since the leading
+//! slash (`/`) will simply be ignored.
+//! The hope is that it will be more probable to cause an early error unless a
+//! compatible relative path *also* exists.
 //!
 //! [windows-reserved]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
 //! [`RelativePath`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html

@@ -13,11 +13,14 @@
 //!
 //! This library includes serde support that can be enabled with the `serde` feature.
 //!
-//! ## Why `std::path` is not portable
+//! ## Why is `std::path` a portability hazard?
 //!
-//! Windows permits using drive volumes as a prefix (e.g. `"c:\"`) and backslash (`\`) as a separator.
+//! Path representations differ across platforms.
 //!
-//! If we use `PathBuf`, Storing paths like this in a manifest would build and run on one platform, but potentially not others.
+//! * Windows permits using drive volumes (multiple roots) as a prefix (e.g. `"c:\"`) and backslash (`\`) as a separator.
+//! * Unix references absolute paths from a single root and uses slash (`/`) as a separator.
+//!
+//! If we use `PathBuf`, Storing paths like this in a manifest would happily allow our applications to build and run on one platform, but potentially not others.
 //!
 //! Consider the following manifest:
 //!
@@ -45,7 +48,7 @@
 //! Anything non-slash will simply be considered part of a *distinct component*.
 //!
 //! Conversion to [`Path`] may only happen if it is known which path it is relative to through the
-//! `to_path` function. This is where the relative part of the name comes from.
+//! [`to_path`] function. This is where the relative part of the name comes from.
 //!
 //! ```rust
 //! use relative_path::RelativePath;
@@ -63,7 +66,7 @@
 //! source = "path/to/source"
 //! ```
 //!
-//! The "fixed" manifest would look like this:
+//! The fixed manifest would look like this:
 //!
 //! ```rust
 //! use relative_path::RelativePathBuf;
@@ -141,10 +144,14 @@
 //! [`normalize`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.normalize
 //! [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html
 //! [`std::path`]: https://doc.rust-lang.org/std/path/index.html
+//! [`Path`]: https://doc.rust-lang.org/std/path/struct.Path.html
 
 // This file contains parts that are Copyright 2015 The Rust Project Developers, copied from:
 // https://github.com/rust-lang/rust
 // cb2a656cdfb6400ac0200c661267f91fabf237e2 src/libstd/path.rs
+
+#![deny(missing_docs)]
+#![deny(intra_doc_link_resolution_failure)]
 
 use std::borrow::{Borrow, Cow};
 use std::cmp;
@@ -203,10 +210,32 @@ where
     }
 }
 
+/// A single path component.
+///
+/// Accessed using the [RelativePath::components] iterator.
+///
+/// # Examples
+///
+/// ```rust
+/// use relative_path::{Component, RelativePath};
+///
+/// let path = RelativePath::new("foo/../bar/./baz");
+/// let mut it = path.components();
+///
+/// assert_eq!(Some(Component::Normal("foo")), it.next());
+/// assert_eq!(Some(Component::ParentDir), it.next());
+/// assert_eq!(Some(Component::Normal("bar")), it.next());
+/// assert_eq!(Some(Component::CurDir), it.next());
+/// assert_eq!(Some(Component::Normal("baz")), it.next());
+/// assert_eq!(None, it.next());
+/// ```
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Component<'a> {
+    /// The current directory `.`.
     CurDir,
+    /// The parent directory `..`.
     ParentDir,
+    /// A normal path component as a string.
     Normal(&'a str),
 }
 
@@ -315,7 +344,8 @@ impl<'a> DoubleEndedIterator for Components<'a> {
 }
 
 impl<'a> Components<'a> {
-    pub fn new(source: &'a str) -> Components<'a> {
+    /// Construct a new component from the given string.
+    fn new(source: &'a str) -> Components<'a> {
         Self { source }
     }
 
@@ -371,6 +401,7 @@ impl<'a> DoubleEndedIterator for Iter<'a> {
     }
 }
 
+/// Error kind for [FromPathError].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FromPathErrorKind {
@@ -382,7 +413,7 @@ pub enum FromPathErrorKind {
     BadSeparator,
 }
 
-/// An error raised when attempting to convert a path using `RelativePathBuf::from_path`.
+/// An error raised when attempting to convert a path using [RelativePathBuf::from_path].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FromPathError {
     kind: FromPathErrorKind,
@@ -896,7 +927,7 @@ impl RelativePath {
         RelativePathBuf::from(self.inner.to_string())
     }
 
-    /// Build an owned `PathBuf` relative to `path` for the current relative path.
+    /// Build an owned `PathBuf` relative to `relative_to` for the current relative path.
     ///
     /// # Examples
     ///
@@ -907,10 +938,52 @@ impl RelativePath {
     /// let path = RelativePath::new("foo/bar").to_path(Path::new("."));
     /// assert_eq!(Path::new("./foo/bar"), path);
     /// ```
+    ///
+    /// # Encoding an absolute path
+    ///
+    /// Absolute paths are, in contrast to when using [PathBuf::push] *ignored*
+    /// and will be added unchanged to the buffer.
+    ///
+    /// This is to preserve the probability of a path conversion failing if the
+    /// relative path contains platform-specific absolute path components.
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    /// use std::path::Path;
+    ///
+    /// if cfg!(windows) {
+    ///     assert_eq!(
+    ///         Path::new("foo\\bar\\baz"),
+    ///         RelativePath::new("/bar/baz").to_path("foo")
+    ///     );
+    ///
+    ///     assert_eq!(
+    ///         Path::new("foo\\c:\\bar\\baz"),
+    ///         RelativePath::new("c:\\bar\\baz").to_path("foo")
+    ///     );
+    /// }
+    ///
+    /// if cfg!(unix) {
+    ///     assert_eq!(
+    ///         Path::new("foo/bar/baz"),
+    ///         RelativePath::new("/bar/baz").to_path("foo")
+    ///     );
+    ///
+    ///     assert_eq!(
+    ///         Path::new("foo/c:\\bar\\baz"),
+    ///         RelativePath::new("c:\\bar\\baz").to_path("foo")
+    ///     );
+    /// }
+    /// ```
     pub fn to_path<P: AsRef<path::Path>>(&self, relative_to: P) -> path::PathBuf {
-        let mut p = relative_to.as_ref().to_path_buf();
-        p.extend(self.components().map(|c| c.as_str()));
-        p
+        let mut p = relative_to.as_ref().to_path_buf().into_os_string();
+
+        for c in self.components() {
+            p.push(path::MAIN_SEPARATOR.encode_utf8(&mut [0u8, 0u8, 0u8, 0u8]));
+            p.push(c.as_str());
+        }
+
+        path::PathBuf::from(p)
     }
 
     /// Returns a relative path, without its final component if there is one.

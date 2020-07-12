@@ -20,11 +20,14 @@ On top of this we support many path-like operations that guarantee portable beha
 
 This library includes serde support that can be enabled with the `serde` feature.
 
-### Why `std::path` is not portable
+### Why is `std::path` a portability hazard?
 
-Windows permits using drive volumes as a prefix (e.g. `"c:\"`) and backslash (`\`) as a separator.
+Path representations differ across platforms.
 
-If we use `PathBuf`, Storing paths like this in a manifest would build and run on one platform, but potentially not others.
+* Windows permits using drive volumes (multiple roots) as a prefix (e.g. `"c:\"`) and backslash (`\`) as a separator.
+* Unix references absolute paths from a single root and uses slash (`/`) as a separator.
+
+If we use `PathBuf`, Storing paths like this in a manifest would happily allow our applications to build and run on one platform, but potentially not others.
 
 Consider the following manifest:
 
@@ -52,7 +55,7 @@ Since [`RelativePath`] strictly uses `/` as a separator it avoids this issue.
 Anything non-slash will simply be considered part of a *distinct component*.
 
 Conversion to [`Path`] may only happen if it is known which path it is relative to through the
-`to_path` function. This is where the relative part of the name comes from.
+[`to_path`] function. This is where the relative part of the name comes from.
 
 ```rust
 use relative_path::RelativePath;
@@ -70,8 +73,6 @@ Where files are referenced from some specific, well-known point in the filesyste
 source = "path/to/source"
 ```
 
-A path like `C:\\path\\to\\source` should simply fail equally badly on both platforms.
-
 The fixed manifest would look like this:
 
 ```rust
@@ -84,31 +85,36 @@ pub struct Manifest {
 }
 ```
 
-### Path comparisons
+### Overview
 
-When two relative paths are compared to each other, their exact component makeup is taken into
-account:
+When two relative paths are compared to each other, their exact component makeup determines equality.
 
 ```rust
 use relative_path::RelativePath;
 
-assert!(RelativePath::new("foo/bar/../baz") != RelativePath::new("foo/baz"));
+assert_ne!(
+    RelativePath::new("foo/bar/../baz"),
+    RelativePath::new("foo/baz")
+);
 ```
 
 Using platform-specific path separators to construct relative paths is not supported.
 
-Path separators from other platforms are therefore treated as part of the component:
+Path separators from other platforms are simply treated as part of a component:
 
 ```rust
 use relative_path::RelativePath;
 
-assert_ne!(RelativePath::new("foo/bar"), RelativePath::new("foo\\bar"));
+assert_ne!(
+    RelativePath::new("foo/bar"),
+    RelativePath::new("foo\\bar")
+);
 
 assert_eq!(1, RelativePath::new("foo\\bar").components().count());
 assert_eq!(2, RelativePath::new("foo/bar").components().count());
 ```
 
-To see if two logical paths are equivalent you can use [`normalize`]:
+To see if two relative paths are equivalent you can use [`normalize`]:
 
 ```rust
 use relative_path::RelativePath;
@@ -145,3 +151,4 @@ This highlights the need to perform as many operations on relative paths as poss
 [`normalize`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.normalize
 [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html
 [`std::path`]: https://doc.rust-lang.org/std/path/index.html
+[`Path`]: https://doc.rust-lang.org/std/path/struct.Path.html

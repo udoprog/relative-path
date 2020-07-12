@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+* Changed `to_path` to ignore platform-specific absolute components ([#18]).
+
+[#18]: https://github.com/udoprog/relative-path/pull/18
+
 ## [1.2.1] - 2020-06-16
 
 ### Changed

@@ -150,6 +150,7 @@
 // https://github.com/rust-lang/rust
 // cb2a656cdfb6400ac0200c661267f91fabf237e2 src/libstd/path.rs
 
+#![doc(html_root_url = "https://docs.rs/relative-path/1.2.1")]
 #![deny(missing_docs)]
 #![deny(intra_doc_link_resolution_failure)]
 

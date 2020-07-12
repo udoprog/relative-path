@@ -508,7 +508,6 @@ impl RelativePathBuf {
     /// ```rust
     /// use relative_path::{RelativePath, RelativePathBuf, FromPathErrorKind};
     /// use std::path::Path;
-    /// use std::ffi::OsStr;
     ///
     /// assert_eq!(
     ///     Ok(RelativePath::new("foo/bar").to_owned()),
@@ -809,13 +808,22 @@ impl RelativePath {
     ///
     /// ```rust
     /// use relative_path::{RelativePath, FromPathErrorKind};
-    /// use std::path::Path;
-    /// use std::ffi::OsStr;
     ///
     /// assert_eq!(
     ///     Ok(RelativePath::new("foo/bar")),
     ///     RelativePath::from_path("foo/bar")
     /// );
+    ///
+    /// // Note: absolute paths are different depending on platform.
+    /// if cfg!(windows) {
+    ///     let e = RelativePath::from_path("c:\\foo\\bar").unwrap_err();
+    ///     assert_eq!(FromPathErrorKind::NonRelative, e.kind());
+    /// }
+    ///
+    /// if cfg!(unix) {
+    ///     let e = RelativePath::from_path("/foo/bar").unwrap_err();
+    ///     assert_eq!(FromPathErrorKind::NonRelative, e.kind());
+    /// }
     /// ```
     pub fn from_path<P: ?Sized + AsRef<path::Path>>(
         path: &P,
@@ -953,7 +961,7 @@ impl RelativePath {
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
-    /// let path = RelativePath::new("foo/bar").to_path(Path::new("."));
+    /// let path = RelativePath::new("foo/bar").to_path(".");
     /// assert_eq!(Path::new("./foo/bar"), path);
     /// ```
     ///
@@ -2162,7 +2170,7 @@ mod tests {
     #[test]
     fn test_to_path_buf() {
         let path = rp("/hello///world//");
-        let path_buf = path.to_path(Path::new("."));
+        let path_buf = path.to_path(".");
         let expected = Path::new(".").join("hello").join("world");
         assert_eq!(expected, path_buf);
     }

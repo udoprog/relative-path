@@ -595,14 +595,12 @@ impl RelativePathBuf {
     /// assert_eq!(RelativePathBuf::from("baz.txt/bar.txt"), buf);
     /// ```
     pub fn set_file_name<S: AsRef<str>>(&mut self, file_name: S) {
-        let file_name = file_name.as_ref();
-
-        if self.file_name().is_some() && !self.pop() {
-            self.inner = file_name.to_string();
-            return;
+        if self.file_name().is_some() {
+            let popped = self.pop();
+            debug_assert!(popped);
         }
 
-        self.push(file_name);
+        self.push(file_name.as_ref());
     }
 
     /// Updates [extension] to `extension`.
@@ -944,7 +942,7 @@ impl RelativePath {
 
     /// Convert to an owned [RelativePathBuf].
     pub fn to_relative_path_buf(&self) -> RelativePathBuf {
-        RelativePathBuf::from(self.inner.to_string())
+        RelativePathBuf::from(self.inner.to_owned())
     }
 
     /// Build an owned [PathBuf] relative to `relative_to` for the current relative path.
@@ -1522,7 +1520,7 @@ impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
             where
                 E: serde::de::Error,
             {
-                Ok(RelativePathBuf::from(input.to_string()))
+                Ok(RelativePathBuf::from(input.to_owned()))
             }
         }
 

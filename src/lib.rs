@@ -635,23 +635,22 @@ impl RelativePathBuf {
     /// assert_eq!(RelativePath::new("feel.nothing"), p);
     /// ```
     pub fn set_extension<S: AsRef<str>>(&mut self, extension: S) -> bool {
-        if self.file_name().is_none() {
-            return false;
-        }
-
-        let mut stem = match self.file_stem() {
-            Some(stem) => stem.to_string(),
-            None => String::new(),
+        let file_stem = match self.file_stem() {
+            Some(stem) => stem,
+            None => return false,
         };
+
+        let end_file_stem = file_stem[file_stem.len()..].as_ptr() as usize;
+        let start = self.inner.as_ptr() as usize;
+        self.inner.truncate(end_file_stem.wrapping_sub(start));
 
         let extension = extension.as_ref();
 
         if !extension.is_empty() {
-            stem.push(STEM_SEP);
-            stem += extension;
+            self.inner.push(STEM_SEP);
+            self.inner.push_str(extension);
         }
 
-        self.set_file_name(&stem);
         true
     }
 
@@ -674,7 +673,7 @@ impl RelativePathBuf {
     /// assert_eq!(RelativePath::new(""), p);
     /// ```
     pub fn pop(&mut self) -> bool {
-        match self.parent().map(|p| p.as_u8_slice().len()) {
+        match self.parent().map(|p| p.inner.len()) {
             Some(len) => {
                 self.inner.truncate(len);
                 true
@@ -851,11 +850,6 @@ impl RelativePath {
         }
 
         Ok(rel)
-    }
-
-    // The following (private!) function reveals the byte encoding used for str.
-    fn as_u8_slice(&self) -> &[u8] {
-        self.inner.as_bytes()
     }
 
     /// Yields the underlying `str` slice.

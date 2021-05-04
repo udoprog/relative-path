@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2021-05-04
+
+### Added
+* `to_logical_path` as an alternative method of converting into a path.
+
+### Changed
+* `set_extension` no longer needs to allocate.
+* `set_file_name` implementation to more closely match
+  `std::path::PathBuf::set_file_name`.
+
 ## [1.3.1], [1.3.2] - 2020-07-12
 
 ### Changed
@@ -48,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#15]: https://github.com/udoprog/relative-path/pull/15
 [#14]: https://github.com/udoprog/relative-path/pull/14
 
-[Unreleased]: https://github.com/udoprog/relative-path/compare/1.3.2...master
+[Unreleased]: https://github.com/udoprog/relative-path/compare/1.4.0...master
+[1.4.0]: https://github.com/udoprog/relative-path/compare/1.3.2...1.4.0
 [1.3.2]: https://github.com/udoprog/relative-path/compare/1.3.1...1.3.2
 [1.3.1]: https://github.com/udoprog/relative-path/compare/1.3.0...1.3.1
 [1.3.0]: https://github.com/udoprog/relative-path/compare/1.2.1...1.3.0

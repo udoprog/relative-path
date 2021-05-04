@@ -49,21 +49,30 @@ source = "C:\\path\\to\\source"
 ```
 
 Assuming `"C:\\path\\to\\source"` is a legal path on Windows, this will
-happily run for one platform when checked into source control but not others.
+happily run for one platform when checked into source control but not
+others.
 
 Since [RelativePath] strictly uses `/` as a separator it avoids this issue.
 Anything non-slash will simply be considered part of a *distinct component*.
 
-Conversion to [Path] may only happen if it is known which path it is relative to through the
-[to_path] function. This is where the relative part of the name comes from.
+Conversion to [Path] may only happen if it is known which path it is
+relative to through the [to_path] or [to_logical_path] functions. This is
+where the relative part of the name comes from.
 
 ```rust
 use relative_path::RelativePath;
 use std::path::Path;
 
-let relative_path = RelativePath::new("foo/bar");
-let path = Path::new("C:\\");
-let full_path = relative_path.to_path(path);
+// to_path unconditionally concatenates a relative path with its base:
+let relative_path = RelativePath::new("../foo/./bar");
+let full_path = relative_path.to_path("C:\\");
+assert_eq!(full_path, Path::new("C:\\..\\foo\\.\\bar"));
+
+// to_logical_path tries to apply the logical operations that the relative
+// path corresponds to:
+let relative_path = RelativePath::new("../foo/./bar");
+let full_path = relative_path.to_logical_path("C:\\baz");
+assert_eq!(full_path, Path::new("C:\\foo\\bar"));
 ```
 
 This would permit relative paths to portably be used in project manifests or configurations.
@@ -174,6 +183,7 @@ compatible relative path *also* exists.
 [windows-reserved]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
 [RelativePath]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html
 [to_path]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path
+[to_logical_path]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_logical_path
 [normalize]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.normalize
 [None]: https://doc.rust-lang.org/std/option/enum.Option.html
 [std::path]: https://doc.rust-lang.org/std/path/index.html

@@ -42,21 +42,32 @@
 //! ```
 //!
 //! Assuming `"C:\\path\\to\\source"` is a legal path on Windows, this will
-//! happily run for one platform when checked into source control but not others.
+//! happily run for one platform when checked into source control but not
+//! others.
 //!
 //! Since [RelativePath] strictly uses `/` as a separator it avoids this issue.
 //! Anything non-slash will simply be considered part of a *distinct component*.
 //!
-//! Conversion to [Path] may only happen if it is known which path it is relative to through the
-//! [to_path] function. This is where the relative part of the name comes from.
+//! Conversion to [Path] may only happen if it is known which path it is
+//! relative to through the [to_path] or [to_logical_path] functions. This is
+//! where the relative part of the name comes from.
 //!
 //! ```rust
 //! use relative_path::RelativePath;
 //! use std::path::Path;
 //!
-//! let relative_path = RelativePath::new("foo/bar");
-//! let path = Path::new("C:\\");
-//! let full_path = relative_path.to_path(path);
+//! # if cfg!(windows) {
+//! // to_path unconditionally concatenates a relative path with its base:
+//! let relative_path = RelativePath::new("../foo/./bar");
+//! let full_path = relative_path.to_path("C:\\");
+//! assert_eq!(full_path, Path::new("C:\\..\\foo\\.\\bar"));
+//!
+//! // to_logical_path tries to apply the logical operations that the relative
+//! // path corresponds to:
+//! let relative_path = RelativePath::new("../foo/./bar");
+//! let full_path = relative_path.to_logical_path("C:\\baz");
+//! assert_eq!(full_path, Path::new("C:\\foo\\bar"));
+//! # }
 //! ```
 //!
 //! This would permit relative paths to portably be used in project manifests or configurations.
@@ -167,6 +178,7 @@
 //! [windows-reserved]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
 //! [RelativePath]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html
 //! [to_path]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path
+//! [to_logical_path]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_logical_path
 //! [normalize]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.normalize
 //! [None]: https://doc.rust-lang.org/std/option/enum.Option.html
 //! [std::path]: https://doc.rust-lang.org/std/path/index.html
@@ -176,9 +188,8 @@
 // https://github.com/rust-lang/rust
 // cb2a656cdfb6400ac0200c661267f91fabf237e2 src/libstd/path.rs
 
-#![doc(html_root_url = "https://docs.rs/relative-path/1.3.2")]
 #![deny(missing_docs)]
-#![deny(intra_doc_link_resolution_failure)]
+#![deny(broken_intra_doc_links)]
 
 use std::borrow::{Borrow, Cow};
 use std::cmp;
@@ -945,7 +956,8 @@ impl RelativePath {
         RelativePathBuf::from(self.inner.to_owned())
     }
 
-    /// Build an owned [PathBuf] relative to `relative_to` for the current relative path.
+    /// Build an owned [PathBuf] relative to `base` for the current relative
+    /// path.
     ///
     /// # Examples
     ///
@@ -996,12 +1008,112 @@ impl RelativePath {
     ///
     /// [PathBuf]: https://doc.rust-lang.org/std/path/struct.PathBuf.html
     /// [PathBuf::push]: https://doc.rust-lang.org/std/path/struct.PathBuf.html#method.push
-    pub fn to_path<P: AsRef<path::Path>>(&self, relative_to: P) -> path::PathBuf {
-        let mut p = relative_to.as_ref().to_path_buf().into_os_string();
+    pub fn to_path<P: AsRef<path::Path>>(&self, base: P) -> path::PathBuf {
+        let mut p = base.as_ref().to_path_buf().into_os_string();
 
         for c in self.components() {
             p.push(path::MAIN_SEPARATOR.encode_utf8(&mut [0u8, 0u8, 0u8, 0u8]));
             p.push(c.as_str());
+        }
+
+        path::PathBuf::from(p)
+    }
+
+    /// Build an owned [PathBuf] relative to `base` for the current relative
+    /// path.
+    ///
+    /// This is similar to [to_path][RelativePath::to_path] except that it
+    /// doesn't just unconditionally append one path to the other, instead it
+    /// performs the following operations depending on its own components:
+    ///
+    /// * [Component::CurDir] leaves the `base` unmodified.
+    /// * [Component::ParentDir] removes a component from `base` using
+    ///   [path::PathBuf::pop].
+    /// * [Component::Normal] pushes the given path component onto `base` using
+    ///   the same mechanism as [to_path][RelativePath::to_path].
+    ///
+    /// Note that the exact semantics of the path operation is determined by the
+    /// corresponding [PathBuf] operation. E.g. popping a component off a path
+    /// like `.` will result in an empty path.
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    /// use std::path::Path;
+    ///
+    /// let path = RelativePath::new("..").to_logical_path(".");
+    /// assert_eq!(path, Path::new(""));
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    /// use std::path::Path;
+    ///
+    /// let path = RelativePath::new("..").to_logical_path("foo/bar");
+    /// assert_eq!(path, Path::new("foo"));
+    /// ```
+    ///
+    /// # Encoding an absolute path
+    ///
+    /// Behaves the same as [to_path][RelativePath::to_path] when encoding
+    /// absolute paths.
+    ///
+    /// Absolute paths are, in contrast to when using [PathBuf::push] *ignored*
+    /// and will be added unchanged to the buffer.
+    ///
+    /// This is to preserve the probability of a path conversion failing if the
+    /// relative path contains platform-specific absolute path components.
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    /// use std::path::Path;
+    ///
+    /// if cfg!(windows) {
+    ///     assert_eq!(
+    ///         Path::new("foo\\bar\\baz"),
+    ///         RelativePath::new("/bar/baz").to_logical_path("foo")
+    ///     );
+    ///
+    ///     assert_eq!(
+    ///         Path::new("foo\\c:\\bar\\baz"),
+    ///         RelativePath::new("c:\\bar\\baz").to_logical_path("foo")
+    ///     );
+    /// }
+    ///
+    /// if cfg!(unix) {
+    ///     assert_eq!(
+    ///         Path::new("foo/bar/baz"),
+    ///         RelativePath::new("/bar/baz").to_logical_path("foo")
+    ///     );
+    ///
+    ///     assert_eq!(
+    ///         Path::new("foo/c:\\bar\\baz"),
+    ///         RelativePath::new("c:\\bar\\baz").to_logical_path("foo")
+    ///     );
+    /// }
+    /// ```
+    ///
+    /// [PathBuf]: https://doc.rust-lang.org/std/path/struct.PathBuf.html
+    /// [PathBuf::push]: https://doc.rust-lang.org/std/path/struct.PathBuf.html#method.push
+    pub fn to_logical_path<P: AsRef<path::Path>>(&self, base: P) -> path::PathBuf {
+        use self::Component::*;
+
+        let mut p = base.as_ref().to_path_buf().into_os_string();
+
+        for c in self.components() {
+            match c {
+                CurDir => continue,
+                ParentDir => {
+                    let mut temp = path::PathBuf::from(std::mem::take(&mut p));
+                    temp.pop();
+                    p = temp.into_os_string();
+                }
+                Normal(c) => {
+                    p.push(path::MAIN_SEPARATOR.encode_utf8(&mut [0u8, 0u8, 0u8, 0u8]));
+                    p.push(c);
+                }
+            }
         }
 
         path::PathBuf::from(p)

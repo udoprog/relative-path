@@ -196,6 +196,7 @@ use std::cmp;
 use std::error;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::iter::FromIterator;
 use std::mem;
 use std::ops::{self, Deref};
 use std::path;
@@ -780,6 +781,20 @@ impl cmp::Ord for RelativePathBuf {
 impl Hash for RelativePathBuf {
     fn hash<H: Hasher>(&self, h: &mut H) {
         self.as_relative_path().hash(h)
+    }
+}
+
+impl<P: AsRef<RelativePath>> Extend<P> for RelativePathBuf {
+    fn extend<I: IntoIterator<Item = P>>(&mut self, iter: I) {
+        iter.into_iter().for_each(move |p| self.push(p.as_ref()));
+    }
+}
+
+impl<P: AsRef<RelativePath>> FromIterator<P> for RelativePathBuf {
+    fn from_iter<I: IntoIterator<Item = P>>(iter: I) -> RelativePathBuf {
+        let mut buf = RelativePathBuf::new();
+        buf.extend(iter);
+        buf
     }
 }
 

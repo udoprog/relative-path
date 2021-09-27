@@ -189,7 +189,7 @@
 // cb2a656cdfb6400ac0200c661267f91fabf237e2 src/libstd/path.rs
 
 #![deny(missing_docs)]
-#![deny(broken_intra_doc_links)]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 use std::borrow::{Borrow, Cow};
 use std::cmp;
@@ -200,7 +200,9 @@ use std::iter::FromIterator;
 use std::mem;
 use std::ops::{self, Deref};
 use std::path;
+use std::rc::Rc;
 use std::str;
+use std::sync::Arc;
 
 #[cfg(feature = "serde")]
 extern crate serde;
@@ -1509,6 +1511,60 @@ impl RelativePath {
     }
 }
 
+impl From<&RelativePath> for Box<RelativePath> {
+    #[inline]
+    fn from(path: &RelativePath) -> Box<RelativePath> {
+        let boxed: Box<str> = path.inner.into();
+        let rw = Box::into_raw(boxed) as *mut RelativePath;
+        unsafe { Box::from_raw(rw) }
+    }
+}
+
+impl From<RelativePathBuf> for Box<RelativePath> {
+    #[inline]
+    fn from(path: RelativePathBuf) -> Box<RelativePath> {
+        let boxed: Box<str> = path.inner.into();
+        let rw = Box::into_raw(boxed) as *mut RelativePath;
+        unsafe { Box::from_raw(rw) }
+    }
+}
+
+impl From<&RelativePath> for Arc<RelativePath> {
+    #[inline]
+    fn from(path: &RelativePath) -> Arc<RelativePath> {
+        let arc: Arc<str> = path.inner.into();
+        let rw = Arc::into_raw(arc) as *const RelativePath;
+        unsafe { Arc::from_raw(rw) }
+    }
+}
+
+impl From<RelativePathBuf> for Arc<RelativePath> {
+    #[inline]
+    fn from(path: RelativePathBuf) -> Arc<RelativePath> {
+        let arc: Arc<str> = path.inner.into();
+        let rw = Arc::into_raw(arc) as *const RelativePath;
+        unsafe { Arc::from_raw(rw) }
+    }
+}
+
+impl From<&RelativePath> for Rc<RelativePath> {
+    #[inline]
+    fn from(path: &RelativePath) -> Rc<RelativePath> {
+        let rc: Rc<str> = path.inner.into();
+        let rw = Rc::into_raw(rc) as *const RelativePath;
+        unsafe { Rc::from_raw(rw) }
+    }
+}
+
+impl From<RelativePathBuf> for Rc<RelativePath> {
+    #[inline]
+    fn from(path: RelativePathBuf) -> Rc<RelativePath> {
+        let rc: Rc<str> = path.inner.into();
+        let rw = Rc::into_raw(rc) as *const RelativePath;
+        unsafe { Rc::from_raw(rw) }
+    }
+}
+
 impl ToOwned for RelativePath {
     type Owned = RelativePathBuf;
 
@@ -1747,6 +1803,8 @@ impl_cmp_str!(&'a RelativePath, String);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::rc::Rc;
+    use std::sync::Arc;
     use std::path::Path;
 
     macro_rules! t(
@@ -2371,6 +2429,15 @@ mod tests {
         );
 
         assert_eq!(rp("foo/bar").to_owned(), RelativePathBuf::from("foo/bar"),);
+
+        assert_eq!(&*Box::<RelativePath>::from(rp("foo/bar")), rp("foo/bar"));
+        assert_eq!(&*Box::<RelativePath>::from(RelativePathBuf::from("foo/bar")), rp("foo/bar"));
+
+        assert_eq!(&*Arc::<RelativePath>::from(rp("foo/bar")), rp("foo/bar"));
+        assert_eq!(&*Arc::<RelativePath>::from(RelativePathBuf::from("foo/bar")), rp("foo/bar"));
+
+        assert_eq!(&*Rc::<RelativePath>::from(rp("foo/bar")), rp("foo/bar"));
+        assert_eq!(&*Rc::<RelativePath>::from(RelativePathBuf::from("foo/bar")), rp("foo/bar"));
     }
 
     #[test]

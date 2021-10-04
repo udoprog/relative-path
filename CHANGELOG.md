@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Added `RelativePath::is_normalized` to check for normalization ([#27]).
+* Added `impl From<&RelativePath> for Box<RelativePath>` ([#26]).
+* Added `impl From<RelativePathBuf> for Box<RelativePath>` ([#26]).
+* Added `impl From<&RelativePath> for Arc<RelativePath>` ([#26]).
+* Added `impl From<RelativePathBuf> for Arc<RelativePath>` ([#26]).
+* Added `impl From<&RelativePath> for Rc<RelativePath>` ([#26]).
+* Added `impl From<RelativePathBuf> for Rc<RelativePath>` ([#26]).
 
 ## [1.5.0] - 2021-07-29
 

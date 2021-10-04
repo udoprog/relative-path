@@ -1263,6 +1263,36 @@ impl RelativePath {
         iter_after(self.components().rev(), child.as_ref().components().rev()).is_some()
     }
 
+    /// Determines whether `self` is normalized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// // These are normalized.
+    /// assert!(RelativePath::new("").is_normalized());
+    /// assert!(RelativePath::new("baz.txt").is_normalized());
+    /// assert!(RelativePath::new("foo/bar/baz.txt").is_normalized());
+    /// assert!(RelativePath::new("..").is_normalized());
+    /// assert!(RelativePath::new("../..").is_normalized());
+    /// assert!(RelativePath::new("../../foo/bar/baz.txt").is_normalized());
+    ///
+    /// // These are not normalized.
+    /// assert!(!RelativePath::new(".").is_normalized());
+    /// assert!(!RelativePath::new("./baz.txt").is_normalized());
+    /// assert!(!RelativePath::new("foo/..").is_normalized());
+    /// assert!(!RelativePath::new("foo/../baz.txt").is_normalized());
+    /// assert!(!RelativePath::new("foo/.").is_normalized());
+    /// assert!(!RelativePath::new("foo/./baz.txt").is_normalized());
+    /// assert!(!RelativePath::new("../foo/./bar/../baz.txt").is_normalized());
+    /// ```
+    pub fn is_normalized(&self) -> bool {
+        self.components()
+            .skip_while(|c| matches!(c, Component::ParentDir))
+            .all(|c| matches!(c, Component::Normal(_)))
+    }
+
     /// Creates an owned [RelativePathBuf] like `self` but with the given file name.
     ///
     /// See [set_file_name] for more details.

@@ -997,6 +997,9 @@ impl RelativePath {
     ///
     /// let path = RelativePath::new("foo/bar").to_path(".");
     /// assert_eq!(Path::new("./foo/bar"), path);
+    ///
+    /// let path = RelativePath::new("foo/bar").to_path("");
+    /// assert_eq!(Path::new("foo/bar"), path);
     /// ```
     ///
     /// # Encoding an absolute path
@@ -1012,27 +1015,19 @@ impl RelativePath {
     /// use std::path::Path;
     ///
     /// if cfg!(windows) {
-    ///     assert_eq!(
-    ///         Path::new("foo\\bar\\baz"),
-    ///         RelativePath::new("/bar/baz").to_path("foo")
-    ///     );
+    ///     let path = RelativePath::new("/bar/baz").to_path("foo");
+    ///     assert_eq!(Path::new("foo\\bar\\baz"), path);
     ///
-    ///     assert_eq!(
-    ///         Path::new("foo\\c:\\bar\\baz"),
-    ///         RelativePath::new("c:\\bar\\baz").to_path("foo")
-    ///     );
+    ///     let path = RelativePath::new("c:\\bar\\baz").to_path("foo");
+    ///     assert_eq!(Path::new("foo\\c:\\bar\\baz"), path);
     /// }
     ///
     /// if cfg!(unix) {
-    ///     assert_eq!(
-    ///         Path::new("foo/bar/baz"),
-    ///         RelativePath::new("/bar/baz").to_path("foo")
-    ///     );
+    ///     let path = RelativePath::new("/bar/baz").to_path("foo");
+    ///     assert_eq!(Path::new("foo/bar/baz"), path);
     ///
-    ///     assert_eq!(
-    ///         Path::new("foo/c:\\bar\\baz"),
-    ///         RelativePath::new("c:\\bar\\baz").to_path("foo")
-    ///     );
+    ///     let path = RelativePath::new("c:\\bar\\baz").to_path("foo");
+    ///     assert_eq!(Path::new("foo/c:\\bar\\baz"), path);
     /// }
     /// ```
     ///
@@ -1042,7 +1037,10 @@ impl RelativePath {
         let mut p = base.as_ref().to_path_buf().into_os_string();
 
         for c in self.components() {
-            p.push(path::MAIN_SEPARATOR.encode_utf8(&mut [0u8, 0u8, 0u8, 0u8]));
+            if !p.is_empty() {
+                p.push(path::MAIN_SEPARATOR.encode_utf8(&mut [0u8, 0u8, 0u8, 0u8]));
+            }
+
             p.push(c.as_str());
         }
 
@@ -1100,27 +1098,25 @@ impl RelativePath {
     /// use std::path::Path;
     ///
     /// if cfg!(windows) {
-    ///     assert_eq!(
-    ///         Path::new("foo\\bar\\baz"),
-    ///         RelativePath::new("/bar/baz").to_logical_path("foo")
-    ///     );
+    ///     let path = RelativePath::new("/bar/baz").to_logical_path("foo");
+    ///     assert_eq!(Path::new("foo\\bar\\baz"), path);
     ///
-    ///     assert_eq!(
-    ///         Path::new("foo\\c:\\bar\\baz"),
-    ///         RelativePath::new("c:\\bar\\baz").to_logical_path("foo")
-    ///     );
+    ///     let path = RelativePath::new("c:\\bar\\baz").to_logical_path("foo");
+    ///     assert_eq!(Path::new("foo\\c:\\bar\\baz"), path);
+    ///
+    ///     let path = RelativePath::new("foo/bar").to_logical_path("");
+    ///     assert_eq!(Path::new("foo\\bar"), path);
     /// }
     ///
     /// if cfg!(unix) {
-    ///     assert_eq!(
-    ///         Path::new("foo/bar/baz"),
-    ///         RelativePath::new("/bar/baz").to_logical_path("foo")
-    ///     );
+    ///     let path = RelativePath::new("/bar/baz").to_logical_path("foo");
+    ///     assert_eq!(Path::new("foo/bar/baz"), path);
     ///
-    ///     assert_eq!(
-    ///         Path::new("foo/c:\\bar\\baz"),
-    ///         RelativePath::new("c:\\bar\\baz").to_logical_path("foo")
-    ///     );
+    ///     let path = RelativePath::new("c:\\bar\\baz").to_logical_path("foo");
+    ///     assert_eq!(Path::new("foo/c:\\bar\\baz"), path);
+    ///
+    ///     let path = RelativePath::new("foo/bar").to_logical_path("");
+    ///     assert_eq!(Path::new("foo/bar"), path);
     /// }
     /// ```
     ///
@@ -1140,7 +1136,10 @@ impl RelativePath {
                     p = temp.into_os_string();
                 }
                 Normal(c) => {
-                    p.push(path::MAIN_SEPARATOR.encode_utf8(&mut [0u8, 0u8, 0u8, 0u8]));
+                    if !p.is_empty() {
+                        p.push(path::MAIN_SEPARATOR.encode_utf8(&mut [0u8, 0u8, 0u8, 0u8]));
+                    }
+
                     p.push(c);
                 }
             }
@@ -1846,9 +1845,9 @@ impl_cmp_str!(&'a RelativePath, String);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     use std::rc::Rc;
     use std::sync::Arc;
-    use std::path::Path;
 
     macro_rules! t(
         ($path:expr, iter: $iter:expr) => (
@@ -2474,13 +2473,22 @@ mod tests {
         assert_eq!(rp("foo/bar").to_owned(), RelativePathBuf::from("foo/bar"),);
 
         assert_eq!(&*Box::<RelativePath>::from(rp("foo/bar")), rp("foo/bar"));
-        assert_eq!(&*Box::<RelativePath>::from(RelativePathBuf::from("foo/bar")), rp("foo/bar"));
+        assert_eq!(
+            &*Box::<RelativePath>::from(RelativePathBuf::from("foo/bar")),
+            rp("foo/bar")
+        );
 
         assert_eq!(&*Arc::<RelativePath>::from(rp("foo/bar")), rp("foo/bar"));
-        assert_eq!(&*Arc::<RelativePath>::from(RelativePathBuf::from("foo/bar")), rp("foo/bar"));
+        assert_eq!(
+            &*Arc::<RelativePath>::from(RelativePathBuf::from("foo/bar")),
+            rp("foo/bar")
+        );
 
         assert_eq!(&*Rc::<RelativePath>::from(rp("foo/bar")), rp("foo/bar"));
-        assert_eq!(&*Rc::<RelativePath>::from(RelativePathBuf::from("foo/bar")), rp("foo/bar"));
+        assert_eq!(
+            &*Rc::<RelativePath>::from(RelativePathBuf::from("foo/bar")),
+            rp("foo/bar")
+        );
     }
 
     #[test]

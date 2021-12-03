@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.6.0] - 2021-12-03
+
+### Added
 * Added `RelativePath::is_normalized` to check for normalization ([#28]).
 * Added `impl From<&RelativePath> for Box<RelativePath>` ([#26]).
 * Added `impl From<RelativePathBuf> for Box<RelativePath>` ([#26]).
@@ -14,12 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added `impl From<&RelativePath> for Rc<RelativePath>` ([#26]).
 * Added `impl From<RelativePathBuf> for Rc<RelativePath>` ([#26]).
 
-## [1.5.1] - 2021-12-03
-
 ### Fixed
 * Changed `to_path` and `to_logical_path` to treat empty paths better ([#29]).
 
 [#29]: https://github.com/udoprog/relative-path/pull/29
+[#28]: https://github.com/udoprog/relative-path/pull/28
+[#26]: https://github.com/udoprog/relative-path/pull/26
 
 ## [1.5.0] - 2021-07-29
 
@@ -79,8 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#15]: https://github.com/udoprog/relative-path/pull/15
 [#14]: https://github.com/udoprog/relative-path/pull/14
 
-[Unreleased]: https://github.com/udoprog/relative-path/compare/1.5.1...master
-[1.5.1]: https://github.com/udoprog/relative-path/compare/1.5.0...1.5.1
+[Unreleased]: https://github.com/udoprog/relative-path/compare/1.6.0...master
+[1.6.0]: https://github.com/udoprog/relative-path/compare/1.5.0...1.6.0
 [1.5.0]: https://github.com/udoprog/relative-path/compare/1.4.0...1.5.0
 [1.4.0]: https://github.com/udoprog/relative-path/compare/1.3.2...1.4.0
 [1.3.2]: https://github.com/udoprog/relative-path/compare/1.3.1...1.3.2

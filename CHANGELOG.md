@@ -14,12 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added `impl From<&RelativePath> for Rc<RelativePath>` ([#26]).
 * Added `impl From<RelativePathBuf> for Rc<RelativePath>` ([#26]).
 
+## [1.5.1] - 2021-12-03
+
+### Fixed
+* Changed `to_path` and `to_logical_path` to treat empty paths better ([#29]).
+
+[#29]: https://github.com/udoprog/relative-path/pull/29
+
 ## [1.5.0] - 2021-07-29
 
 ### Added
 * Implement Extend and FromIterator for RelativePathBuf ([#25]).
 
-[#25]: https://github.com/udoprog/relative-path/pull/18
+[#25]: https://github.com/udoprog/relative-path/pull/25
 
 ## [1.4.0] - 2021-05-04
 
@@ -72,7 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#15]: https://github.com/udoprog/relative-path/pull/15
 [#14]: https://github.com/udoprog/relative-path/pull/14
 
-[Unreleased]: https://github.com/udoprog/relative-path/compare/1.5.0...master
+[Unreleased]: https://github.com/udoprog/relative-path/compare/1.5.1...master
+[1.5.1]: https://github.com/udoprog/relative-path/compare/1.5.0...1.5.1
 [1.5.0]: https://github.com/udoprog/relative-path/compare/1.4.0...1.5.0
 [1.4.0]: https://github.com/udoprog/relative-path/compare/1.3.2...1.4.0
 [1.3.2]: https://github.com/udoprog/relative-path/compare/1.3.1...1.3.2

@@ -1474,9 +1474,9 @@ impl RelativePath {
     ///
     /// This function will return the empty [RelativePath] `""` if this source
     /// contains unnamed components like `..` that would have to be traversed to
-    /// reach the destination. This is necessary since we have no way of knowing
-    /// what the names of those components are when we're building the new
-    /// relative path.
+    /// reach the destination `path`. This is necessary since we have no way of
+    /// knowing what the names of those components are when we're building the
+    /// new relative path.
     ///
     /// ```
     /// use relative_path::RelativePath;
@@ -1484,9 +1484,9 @@ impl RelativePath {
     /// // Here we don't know what directories `../..` refers to, so there's no
     /// // way to construct a path back to `bar` in the current directory from
     /// // `../..`.
-    /// let source = RelativePath::new("../../foo/relative-path");
-    /// let destination = RelativePath::new("bar");
-    /// assert_eq!("", source.relative(destination));
+    /// let from = RelativePath::new("../../foo/relative-path");
+    /// let to = RelativePath::new("bar");
+    /// assert_eq!("", from.relative(to));
     /// ```
     ///
     /// One exception to this is when two paths contains a common prefix at
@@ -1496,15 +1496,15 @@ impl RelativePath {
     /// ```
     /// use relative_path::RelativePath;
     ///
-    /// let source = RelativePath::new("../../foo/bar");
-    /// let destination = RelativePath::new("../../foo/baz");
+    /// let from = RelativePath::new("../../foo/bar");
+    /// let to = RelativePath::new("../../foo/baz");
     ///
-    /// assert_eq!("../baz", source.relative(destination));
+    /// assert_eq!("../baz", from.relative(to));
     ///
-    /// let source = RelativePath::new("../a/../../foo/bar");
-    /// let destination = RelativePath::new("../../foo/baz");
+    /// let from = RelativePath::new("../a/../../foo/bar");
+    /// let to = RelativePath::new("../../foo/baz");
     ///
-    /// assert_eq!("../baz", source.relative(destination));
+    /// assert_eq!("../baz", from.relative(to));
     /// ```
     ///
     /// # Examples

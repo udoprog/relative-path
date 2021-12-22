@@ -1472,38 +1472,39 @@ impl RelativePath {
 
     /// Constructs a relative path from the current path, to `path`.
     ///
-    /// This function will return the empty relative path `""` if the component
-    /// we are traversing *from* contains unnamed components like `..` that
-    /// would have to be traversed to reach the destination. This is necessary,
-    /// since we have no idea what the names of those components are when we're
-    /// building the new relative path.
+    /// This function will return the empty [RelativePath] `""` if this source
+    /// contains unnamed components like `..` that would have to be traversed to
+    /// reach the destination. This is necessary since we have no way of knowing
+    /// what the names of those components are when we're building the new
+    /// relative path.
     ///
     /// ```
     /// use relative_path::RelativePath;
     ///
-    /// // Here we don't know what directories `../..` refer to, so there's no
-    /// // way to construct a path back to `bar` from `../..`.
-    /// let r = RelativePath::new("../../foo/relative-path");
-    /// let p = RelativePath::new("bar");
-    /// assert_eq!("", r.relative(p));
+    /// // Here we don't know what directories `../..` refers to, so there's no
+    /// // way to construct a path back to `bar` in the current directory from
+    /// // `../..`.
+    /// let source = RelativePath::new("../../foo/relative-path");
+    /// let destination = RelativePath::new("bar");
+    /// assert_eq!("", source.relative(destination));
     /// ```
     ///
-    /// One exception to this is when two paths contains a common prefix, at
+    /// One exception to this is when two paths contains a common prefix at
     /// which point there's no need to know what the names of those unnamed
     /// components are.
     ///
     /// ```rust
     /// use relative_path::RelativePath;
     ///
-    /// let a = RelativePath::new("../../foo/bar");
-    /// let b = RelativePath::new("../../foo/baz");
+    /// let source = RelativePath::new("../../foo/bar");
+    /// let destination = RelativePath::new("../../foo/baz");
     ///
-    /// assert_eq!("../baz", a.relative(b));
+    /// assert_eq!("../baz", source.relative(destination));
     ///
-    /// let a = RelativePath::new("../a/../../foo/bar");
-    /// let b = RelativePath::new("../../foo/baz");
+    /// let source = RelativePath::new("../a/../../foo/bar");
+    /// let destination = RelativePath::new("../../foo/baz");
     ///
-    /// assert_eq!("../baz", a.relative(b));
+    /// assert_eq!("../baz", source.relative(destination));
     /// ```
     ///
     /// # Examples
@@ -1521,10 +1522,10 @@ impl RelativePath {
     ///     RelativePath::new("a/../aaa").relative(RelativePath::new("b/../bbb"))
     /// );
     ///
-    /// let p = RelativePath::new("git/relative-path");
-    /// let r = RelativePath::new("git");
-    /// assert_eq!("relative-path", r.relative(p));
-    /// assert_eq!("..", p.relative(r));
+    /// let a = RelativePath::new("git/relative-path");
+    /// let b = RelativePath::new("git");
+    /// assert_eq!("relative-path", b.relative(a));
+    /// assert_eq!("..", a.relative(b));
     ///
     /// let a = RelativePath::new("foo/bar/bap/foo.h");
     /// let b = RelativePath::new("../arch/foo.h");

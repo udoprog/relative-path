@@ -478,7 +478,7 @@ impl FromPathError {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use std::path::Path;
     /// use relative_path::{FromPathErrorKind, RelativePathBuf};
     ///
@@ -541,7 +541,7 @@ impl RelativePathBuf {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::{RelativePath, RelativePathBuf, FromPathErrorKind};
     /// use std::path::Path;
     ///
@@ -573,7 +573,7 @@ impl RelativePathBuf {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::{RelativePathBuf, RelativePath};
     ///
     /// let mut path = RelativePathBuf::new();
@@ -853,7 +853,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::{RelativePath, FromPathErrorKind};
     ///
     /// assert_eq!(
@@ -935,7 +935,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     ///
     /// let path = RelativePath::new("foo/bar");
@@ -951,7 +951,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::{Component, RelativePath};
     ///
     /// let path = RelativePath::new("foo/bar/baz");
@@ -1000,7 +1000,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
@@ -1019,7 +1019,7 @@ impl RelativePath {
     /// This is to preserve the probability of a path conversion failing if the
     /// relative path contains platform-specific absolute path components.
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
@@ -1073,7 +1073,7 @@ impl RelativePath {
     /// corresponding [PathBuf] operation. E.g. popping a component off a path
     /// like `.` will result in an empty path.
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
@@ -1083,7 +1083,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
@@ -1102,7 +1102,7 @@ impl RelativePath {
     /// This is to preserve the probability of a path conversion failing if the
     /// relative path contains platform-specific absolute path components.
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
@@ -1161,7 +1161,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     ///
     /// assert_eq!(Some(RelativePath::new("foo")), RelativePath::new("foo/bar").parent());
@@ -1416,7 +1416,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     ///
     /// assert_eq!(
@@ -1451,7 +1451,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     ///
     /// assert_eq!(
@@ -1493,7 +1493,7 @@ impl RelativePath {
     /// which point there's no need to know what the names of those unnamed
     /// components are.
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     ///
     /// let source = RelativePath::new("../../foo/bar");
@@ -1509,7 +1509,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     ///
     /// assert_eq!(

@@ -323,7 +323,7 @@ impl<'a> Component<'a> {
 /// This takes '.', and '..' into account. Where '.' doesn't change the stack, and '..' pops the
 /// last item or further adds parent components.
 #[inline(always)]
-fn relative_traversal<'a, C>(stack: &mut Vec<&'a str>, components: C)
+fn relative_traversal<'a, C>(buf: &mut RelativePathBuf, components: C)
 where
     C: IntoIterator<Item = Component<'a>>,
 {
@@ -332,15 +332,17 @@ where
     for c in components {
         match c {
             CurDir => (),
-            ParentDir => match stack.last().copied() {
-                Some(PARENT_STR) | None => {
-                    stack.push(PARENT_STR);
+            ParentDir => match buf.components().next_back() {
+                Some(Component::ParentDir) | None => {
+                    buf.push(PARENT_STR);
                 }
                 _ => {
-                    stack.pop();
+                    buf.pop();
                 }
             },
-            Normal(name) => stack.push(name),
+            Normal(name) => {
+                buf.push(name);
+            }
         }
     }
 }
@@ -1421,10 +1423,10 @@ impl RelativePath {
     /// );
     /// ```
     pub fn join_normalized<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
-        let mut stack = Vec::new();
-        relative_traversal(&mut stack, self.components());
-        relative_traversal(&mut stack, path.as_ref().components());
-        RelativePathBuf::from(stack.join("/"))
+        let mut buf = RelativePathBuf::new();
+        relative_traversal(&mut buf, self.components());
+        relative_traversal(&mut buf, path.as_ref().components());
+        buf
     }
 
     /// Return an owned [RelativePathBuf], with all non-normal components moved to the beginning of
@@ -1456,9 +1458,9 @@ impl RelativePath {
     /// );
     /// ```
     pub fn normalize(&self) -> RelativePathBuf {
-        let mut stack = Vec::new();
-        relative_traversal(&mut stack, self.components());
-        RelativePathBuf::from(stack.join("/"))
+        let mut buf = RelativePathBuf::new();
+        relative_traversal(&mut buf, self.components());
+        buf
     }
 
     /// Constructs a relative path from the current path, to `path`.
@@ -1494,8 +1496,8 @@ impl RelativePath {
     /// assert_eq!("", b.relative(a));
     /// ```
     pub fn relative<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
-        let mut from = Vec::new();
-        let mut to = Vec::new();
+        let mut from = RelativePathBuf::new();
+        let mut to = RelativePathBuf::new();
 
         relative_traversal(&mut from, self.components());
         relative_traversal(&mut to, path.as_ref().components());
@@ -1507,39 +1509,35 @@ impl RelativePath {
         //
         // Also note that `relative_traversal` guarantees that all ParentDir
         // components are at the head of the stack.
-        if !from.is_empty() && from[0] == PARENT_STR {
+        if from.components().next() == Some(Component::ParentDir) {
             return RelativePathBuf::new();
         }
 
-        let mut from = from.into_iter();
-        let mut to = to.into_iter();
+        let mut from = from.components();
+        let mut to = to.components();
 
-        // keep track of the last component tracked in to, since we need to
-        // append it after we've identified common components.
-        let tail;
+        let mut buf = RelativePathBuf::new();
 
-        let mut buffer = RelativePathBuf::new();
-
-        // strip common prefixes
-        loop {
+        // Strip common prefixes and return the last component tracked in to,
+        // since we need to append it after we've identified common components.
+        let tail = loop {
             match (from.next(), to.next()) {
                 (Some(from), Some(to)) if from == to => continue,
                 (from, to) => {
                     if from.is_some() {
-                        buffer.push(PARENT_STR);
+                        buf.push(PARENT_STR);
                     }
 
-                    tail = to;
-                    break;
+                    break to;
                 }
             }
+        };
+
+        for c in from.map(|_| Component::ParentDir).chain(tail).chain(to) {
+            buf.push(c.as_str());
         }
 
-        for c in from.map(|_| PARENT_STR).chain(tail).chain(to) {
-            buffer.push(c);
-        }
-
-        buffer
+        buf
     }
 
     /// Check if path starts with a path separator.

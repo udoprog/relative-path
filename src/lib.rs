@@ -478,7 +478,7 @@ impl FromPathError {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use std::path::Path;
     /// use relative_path::{FromPathErrorKind, RelativePathBuf};
     ///
@@ -528,13 +528,20 @@ impl RelativePathBuf {
         }
     }
 
+    /// Internal constructor to allocate a relative path buf with the given capacity.
+    fn with_capacity(cap: usize) -> RelativePathBuf {
+        RelativePathBuf {
+            inner: String::with_capacity(cap),
+        }
+    }
+
     /// Try to convert a [Path] to a [RelativePathBuf].
     ///
     /// [Path]: https://doc.rust-lang.org/std/path/struct.Path.html
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::{RelativePath, RelativePathBuf, FromPathErrorKind};
     /// use std::path::Path;
     ///
@@ -566,7 +573,7 @@ impl RelativePathBuf {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::{RelativePathBuf, RelativePath};
     ///
     /// let mut path = RelativePathBuf::new();
@@ -846,7 +853,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::{RelativePath, FromPathErrorKind};
     ///
     /// assert_eq!(
@@ -928,7 +935,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     ///
     /// let path = RelativePath::new("foo/bar");
@@ -944,7 +951,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::{Component, RelativePath};
     ///
     /// let path = RelativePath::new("foo/bar/baz");
@@ -993,7 +1000,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
@@ -1012,7 +1019,7 @@ impl RelativePath {
     /// This is to preserve the probability of a path conversion failing if the
     /// relative path contains platform-specific absolute path components.
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
@@ -1066,7 +1073,7 @@ impl RelativePath {
     /// corresponding [PathBuf] operation. E.g. popping a component off a path
     /// like `.` will result in an empty path.
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
@@ -1076,7 +1083,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
@@ -1095,7 +1102,7 @@ impl RelativePath {
     /// This is to preserve the probability of a path conversion failing if the
     /// relative path contains platform-specific absolute path components.
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     /// use std::path::Path;
     ///
@@ -1154,7 +1161,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     ///
     /// assert_eq!(Some(RelativePath::new("foo")), RelativePath::new("foo/bar").parent());
@@ -1409,7 +1416,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     ///
     /// assert_eq!(
@@ -1444,7 +1451,7 @@ impl RelativePath {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     ///
     /// assert_eq!(
@@ -1465,9 +1472,44 @@ impl RelativePath {
 
     /// Constructs a relative path from the current path, to `path`.
     ///
+    /// This function will return the empty [RelativePath] `""` if this source
+    /// contains unnamed components like `..` that would have to be traversed to
+    /// reach the destination `path`. This is necessary since we have no way of
+    /// knowing what the names of those components are when we're building the
+    /// new relative path.
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// // Here we don't know what directories `../..` refers to, so there's no
+    /// // way to construct a path back to `bar` in the current directory from
+    /// // `../..`.
+    /// let from = RelativePath::new("../../foo/relative-path");
+    /// let to = RelativePath::new("bar");
+    /// assert_eq!("", from.relative(to));
+    /// ```
+    ///
+    /// One exception to this is when two paths contains a common prefix at
+    /// which point there's no need to know what the names of those unnamed
+    /// components are.
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// let from = RelativePath::new("../../foo/bar");
+    /// let to = RelativePath::new("../../foo/baz");
+    ///
+    /// assert_eq!("../baz", from.relative(to));
+    ///
+    /// let from = RelativePath::new("../a/../../foo/bar");
+    /// let to = RelativePath::new("../../foo/baz");
+    ///
+    /// assert_eq!("../baz", from.relative(to));
+    /// ```
+    ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use relative_path::RelativePath;
     ///
     /// assert_eq!(
@@ -1480,15 +1522,10 @@ impl RelativePath {
     ///     RelativePath::new("a/../aaa").relative(RelativePath::new("b/../bbb"))
     /// );
     ///
-    /// let p = RelativePath::new("git/relative-path");
-    /// let r = RelativePath::new("git");
-    /// assert_eq!("relative-path", r.relative(p));
-    /// assert_eq!("..", p.relative(r));
-    ///
-    /// let p = RelativePath::new("../../git/relative-path");
-    /// let r = RelativePath::new("git");
-    /// assert_eq!("../../../git/relative-path", r.relative(p));
-    /// assert_eq!("", p.relative(r));
+    /// let a = RelativePath::new("git/relative-path");
+    /// let b = RelativePath::new("git");
+    /// assert_eq!("relative-path", b.relative(a));
+    /// assert_eq!("..", a.relative(b));
     ///
     /// let a = RelativePath::new("foo/bar/bap/foo.h");
     /// let b = RelativePath::new("../arch/foo.h");
@@ -1502,38 +1539,36 @@ impl RelativePath {
         relative_traversal(&mut from, self.components());
         relative_traversal(&mut to, path.as_ref().components());
 
+        let mut it_from = from.components();
+        let mut it_to = to.components();
+
+        // Strip a common prefixes - if any.
+        let (lead_from, lead_to) = loop {
+            match (it_from.next(), it_to.next()) {
+                (Some(f), Some(t)) if f == t => continue,
+                (f, t) => {
+                    break (f, t);
+                }
+            }
+        };
+
         // Special case: The path we are traversing from can't contain unnamed
         // components. A relative path might be any path, like `/`, or
         // `/foo/bar/baz`, and these components cannot be named in the relative
         // traversal.
         //
         // Also note that `relative_traversal` guarantees that all ParentDir
-        // components are at the head of the stack.
-        if from.components().next() == Some(Component::ParentDir) {
+        // components are at the head of the path being built.
+        if lead_from == Some(Component::ParentDir) {
             return RelativePathBuf::new();
         }
 
-        let mut from = from.components();
-        let mut to = to.components();
+        let head = lead_from.into_iter().chain(it_from);
+        let tail = lead_to.into_iter().chain(it_to);
 
-        let mut buf = RelativePathBuf::new();
+        let mut buf = RelativePathBuf::with_capacity(usize::max(from.inner.len(), to.inner.len()));
 
-        // Strip common prefixes and return the last component tracked in to,
-        // since we need to append it after we've identified common components.
-        let tail = loop {
-            match (from.next(), to.next()) {
-                (Some(from), Some(to)) if from == to => continue,
-                (from, to) => {
-                    if from.is_some() {
-                        buf.push(PARENT_STR);
-                    }
-
-                    break to;
-                }
-            }
-        };
-
-        for c in from.map(|_| Component::ParentDir).chain(tail).chain(to) {
+        for c in head.map(|_| Component::ParentDir).chain(tail) {
             buf.push(c.as_str());
         }
 

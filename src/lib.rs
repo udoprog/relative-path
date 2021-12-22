@@ -528,6 +528,13 @@ impl RelativePathBuf {
         }
     }
 
+    /// Internal constructor to allocate a relative path buf with the given capacity.
+    fn with_capacity(cap: usize) -> RelativePathBuf {
+        RelativePathBuf {
+            inner: String::with_capacity(cap),
+        }
+    }
+
     /// Try to convert a [Path] to a [RelativePathBuf].
     ///
     /// [Path]: https://doc.rust-lang.org/std/path/struct.Path.html
@@ -1465,6 +1472,40 @@ impl RelativePath {
 
     /// Constructs a relative path from the current path, to `path`.
     ///
+    /// This function will return the empty relative path `""` if the component
+    /// we are traversing *from* contains unnamed components like `..` that
+    /// would have to be traversed to reach the destination. This is necessary,
+    /// since we have no idea what the names of those components are when we're
+    /// building the new relative path.
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// // Here we don't know what directories `../..` refer to, so there's no
+    /// // way to construct a path back to `bar` from `../..`.
+    /// let r = RelativePath::new("../../foo/relative-path");
+    /// let p = RelativePath::new("bar");
+    /// assert_eq!("", r.relative(p));
+    /// ```
+    ///
+    /// One exception to this is when two paths contains a common prefix, at
+    /// which point there's no need to know what the names of those unnamed
+    /// components are.
+    ///
+    /// ```rust
+    /// use relative_path::RelativePath;
+    ///
+    /// let a = RelativePath::new("../../foo/bar");
+    /// let b = RelativePath::new("../../foo/baz");
+    ///
+    /// assert_eq!("../baz", a.relative(b));
+    ///
+    /// let a = RelativePath::new("../a/../../foo/bar");
+    /// let b = RelativePath::new("../../foo/baz");
+    ///
+    /// assert_eq!("../baz", a.relative(b));
+    /// ```
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -1485,11 +1526,6 @@ impl RelativePath {
     /// assert_eq!("relative-path", r.relative(p));
     /// assert_eq!("..", p.relative(r));
     ///
-    /// let p = RelativePath::new("../../git/relative-path");
-    /// let r = RelativePath::new("git");
-    /// assert_eq!("../../../git/relative-path", r.relative(p));
-    /// assert_eq!("", p.relative(r));
-    ///
     /// let a = RelativePath::new("foo/bar/bap/foo.h");
     /// let b = RelativePath::new("../arch/foo.h");
     /// assert_eq!("../../../../../arch/foo.h", a.relative(b));
@@ -1502,38 +1538,36 @@ impl RelativePath {
         relative_traversal(&mut from, self.components());
         relative_traversal(&mut to, path.as_ref().components());
 
+        let mut it_from = from.components();
+        let mut it_to = to.components();
+
+        // Strip a common prefixes - if any.
+        let (lead_from, lead_to) = loop {
+            match (it_from.next(), it_to.next()) {
+                (Some(f), Some(t)) if f == t => continue,
+                (f, t) => {
+                    break (f, t);
+                }
+            }
+        };
+
         // Special case: The path we are traversing from can't contain unnamed
         // components. A relative path might be any path, like `/`, or
         // `/foo/bar/baz`, and these components cannot be named in the relative
         // traversal.
         //
         // Also note that `relative_traversal` guarantees that all ParentDir
-        // components are at the head of the stack.
-        if from.components().next() == Some(Component::ParentDir) {
+        // components are at the head of the path being built.
+        if lead_from == Some(Component::ParentDir) {
             return RelativePathBuf::new();
         }
 
-        let mut from = from.components();
-        let mut to = to.components();
+        let head = lead_from.into_iter().chain(it_from);
+        let tail = lead_to.into_iter().chain(it_to);
 
-        let mut buf = RelativePathBuf::new();
+        let mut buf = RelativePathBuf::with_capacity(usize::max(from.inner.len(), to.inner.len()));
 
-        // Strip common prefixes and return the last component tracked in to,
-        // since we need to append it after we've identified common components.
-        let tail = loop {
-            match (from.next(), to.next()) {
-                (Some(from), Some(to)) if from == to => continue,
-                (from, to) => {
-                    if from.is_some() {
-                        buf.push(PARENT_STR);
-                    }
-
-                    break to;
-                }
-            }
-        };
-
-        for c in from.map(|_| Component::ParentDir).chain(tail).chain(to) {
+        for c in head.map(|_| Component::ParentDir).chain(tail) {
             buf.push(c.as_str());
         }
 

@@ -21,6 +21,16 @@ behavior.
 
 <br>
 
+### Usage
+
+Add the following to your `Cargo.toml`:
+
+```toml
+relative-path = "1.6.1"
+```
+
+<br>
+
 ### Serde Support
 
 This library includes serde support that can be enabled with the `serde`

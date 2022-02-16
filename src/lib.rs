@@ -743,6 +743,11 @@ impl RelativePathBuf {
     pub fn as_relative_path(&self) -> &RelativePath {
         self
     }
+
+    /// Consumes the `RelativePathBuf`, yielding its internal [`String`] storage.
+    pub fn into_string(self) -> String {
+        self.inner
+    }
 }
 
 impl Default for RelativePathBuf {
@@ -794,6 +799,12 @@ impl<'a, T: ?Sized + AsRef<str>> From<&'a T> for RelativePathBuf {
 impl From<String> for RelativePathBuf {
     fn from(path: String) -> RelativePathBuf {
         RelativePathBuf { inner: path }
+    }
+}
+
+impl From<RelativePathBuf> for String {
+    fn from(path: RelativePathBuf) -> String {
+        path.into_string()
     }
 }
 

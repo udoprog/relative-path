@@ -751,7 +751,7 @@ impl RelativePathBuf {
     /// ```
     /// use relative_path::RelativePathBuf;
     ///
-    /// let p = RelativePathBuf::new("/the/head");
+    /// let p = RelativePathBuf::from("/the/head");
     /// let string = p.into_string();
     /// assert_eq!(string, "/the/head".to_owned());
     /// ```

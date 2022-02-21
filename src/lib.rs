@@ -745,6 +745,16 @@ impl RelativePathBuf {
     }
 
     /// Consumes the `RelativePathBuf`, yielding its internal [`String`] storage.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use relative_path::RelativePath;
+    ///
+    /// let p = RelativePath::from("/the/head");
+    /// let string = p.into_string();
+    /// assert_eq!(string, "/the/head".to_owned());
+    /// ```
     pub fn into_string(self) -> String {
         self.inner
     }

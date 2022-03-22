@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2022-03-22
+
+### Added
+* Added `Clone` implementation for `Box<RelativePath>` with `RelativePathBuf::into_boxed_relative_path` ([#37]).
+
+[#37]: https://github.com/udoprog/relative-path/pull/37
+
 ## [1.6.1] - 2022-02-07
 
 ### Changed

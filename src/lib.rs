@@ -758,6 +758,12 @@ impl RelativePathBuf {
     pub fn into_string(self) -> String {
         self.inner
     }
+
+    /// Converts this `RelativePathBuf` into a [boxed](Box) [`RelativePath`].
+    pub fn into_boxed_relative_path(self) -> Box<RelativePath> {
+        let rw = Box::into_raw(self.inner.into_boxed_str()) as *mut RelativePath;
+        unsafe { Box::from_raw(rw) }
+    }
 }
 
 impl Default for RelativePathBuf {
@@ -1645,6 +1651,12 @@ impl From<RelativePathBuf> for Box<RelativePath> {
         let boxed: Box<str> = path.inner.into();
         let rw = Box::into_raw(boxed) as *mut RelativePath;
         unsafe { Box::from_raw(rw) }
+    }
+}
+
+impl Clone for Box<RelativePath> {
+    fn clone(&self) -> Self {
+        self.to_relative_path_buf().into_boxed_relative_path()
     }
 }
 

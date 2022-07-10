@@ -27,7 +27,7 @@ across platforms.
 Add the following to your `Cargo.toml`:
 
 ```toml
-relative-path = "1.7.1"
+relative-path = "1.7.2"
 ```
 
 <br>

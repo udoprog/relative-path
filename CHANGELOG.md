@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.1] - 2022-07-10
+
+### Changed
+* Updated documentation to be easier to follow.
+
 ## [1.7.0] - 2022-03-22
 
 ### Added
@@ -95,7 +100,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#15]: https://github.com/udoprog/relative-path/pull/15
 [#14]: https://github.com/udoprog/relative-path/pull/14
 
-[Unreleased]: https://github.com/udoprog/relative-path/compare/1.6.1...master
+[Unreleased]: https://github.com/udoprog/relative-path/compare/1.7.1...master
+[1.7.1]: https://github.com/udoprog/relative-path/compare/1.7.0...1.7.1
+[1.7.0]: https://github.com/udoprog/relative-path/compare/1.6.1...1.7.0
 [1.6.1]: https://github.com/udoprog/relative-path/compare/1.6.0...1.6.1
 [1.6.0]: https://github.com/udoprog/relative-path/compare/1.5.0...1.6.0
 [1.5.0]: https://github.com/udoprog/relative-path/compare/1.4.0...1.5.0

@@ -55,6 +55,7 @@ Consider the following data model and corresponding toml for a manifest:
 
 ```rust
 use std::path::PathBuf;
+
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
@@ -239,11 +240,12 @@ if cfg!(unix) {
 }
 ```
 
-[`std::env::current_dir`]: https://doc.rust-lang.org/std/env/fn.current_dir.html
 [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html
 [`normalize`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.normalize
 [`Path`]: https://doc.rust-lang.org/std/path/struct.Path.html
 [`RelativePath`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html
+[`RelativePathBuf`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePathBuf.html
+[`std::env::current_dir`]: https://doc.rust-lang.org/std/env/fn.current_dir.html
 [`std::path`]: https://doc.rust-lang.org/std/path/index.html
 [`to_logical_path`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_logical_path
 [`to_path`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path

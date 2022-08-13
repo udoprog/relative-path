@@ -625,6 +625,11 @@ fn test_from() {
         RelativePathBuf::from(String::from("foo/bar")),
     );
 
+    assert_eq!(
+        RelativePathBuf::from(rp("foo/bar")),
+        RelativePathBuf::from("foo/bar"),
+    );
+
     assert_eq!(rp("foo/bar").to_owned(), RelativePathBuf::from("foo/bar"),);
 
     assert_eq!(&*Box::<RelativePath>::from(rp("foo/bar")), rp("foo/bar"));
@@ -644,6 +649,11 @@ fn test_from() {
         &*Rc::<RelativePath>::from(RelativePathBuf::from("foo/bar")),
         rp("foo/bar")
     );
+}
+
+#[test]
+fn test_relative_path_asref_str() {
+    assert_eq!(<RelativePath as AsRef<str>>::as_ref(rp("foo/bar")), "foo/bar");
 }
 
 #[test]

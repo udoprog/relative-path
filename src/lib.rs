@@ -828,6 +828,12 @@ impl AsRef<RelativePath> for RelativePathBuf {
     }
 }
 
+impl AsRef<str> for RelativePath {
+    fn as_ref(&self) -> &str {
+        &self.inner
+    }
+}
+
 impl Borrow<RelativePath> for RelativePathBuf {
     fn borrow(&self) -> &RelativePath {
         self.deref()

@@ -3,8 +3,7 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  test:
-    name: Test
+  build:
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
     strategy:
@@ -22,5 +21,15 @@ jobs:
       with:
         toolchain: ${{ matrix.toolchain }}
         override: true
-    - run: cargo build --features ci
-    - run: cargo test --features ci
+    - run: cargo build --no-default-features
+    - run: cargo build --all-features
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.toolchain }}
+        override: true
+    - run: cargo test --all-features

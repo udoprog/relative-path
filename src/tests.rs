@@ -653,7 +653,10 @@ fn test_from() {
 
 #[test]
 fn test_relative_path_asref_str() {
-    assert_eq!(<RelativePath as AsRef<str>>::as_ref(rp("foo/bar")), "foo/bar");
+    assert_eq!(
+        <RelativePath as AsRef<str>>::as_ref(rp("foo/bar")),
+        "foo/bar"
+    );
 }
 
 #[test]

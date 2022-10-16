@@ -17,8 +17,6 @@ edition = "2018"
 [features]
 default = []
 
-ci = ["serde"]
-
 [dependencies]
 serde = { version = "1.0", optional = true }
 

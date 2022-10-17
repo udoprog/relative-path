@@ -2,21 +2,19 @@ name: CI
 
 on: [push, pull_request]
 
-strategy: &strategy
-  matrix:
-    os: [ubuntu-latest, windows-latest, macos-latest]
-    toolchain: [stable, beta]
-    experimental: [false]
-    include:
-      - toolchain: nightly
-        os: ubuntu-latest
-        experimental: true
-
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
-    strategy: *strategy
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        toolchain: [stable, beta]
+        experimental: [false]
+        include:
+          - toolchain: nightly
+            os: ubuntu-latest
+            experimental: true
     steps:
     - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
@@ -25,15 +23,4 @@ jobs:
         override: true
     - run: cargo build --no-default-features
     - run: cargo build --all-features
-
-  test:
-    runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.experimental }}
-    strategy: *strategy
-    steps:
-    - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: ${{ matrix.toolchain }}
-        override: true
     - run: cargo test --all-features

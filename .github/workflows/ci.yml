@@ -1,26 +1,22 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  pull_request: {}
+  push:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.experimental }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        toolchain: [stable, beta]
-        experimental: [false]
-        include:
-          - toolchain: nightly
-            os: ubuntu-latest
-            experimental: true
+        toolchain: ["1.56.0", stable]
     steps:
     - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: ${{ matrix.toolchain }}
-        override: true
+    - run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal
+    - run: rustup default ${{ matrix.toolchain }}
     - run: cargo build --no-default-features
     - run: cargo build --all-features
     - run: cargo test --all-features

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2023-03-05
+
+### Added
+* Deserialize implementation and conversions for `Box<RelativePath>`.
+* `From<&str>`, `From<Box<str>>`, for `Box<RelativePath>`.
+* Added tests for most trait implementations.
+
 ## [1.7.3] - 2023-01-02
 
 ### Changed
@@ -105,8 +112,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#15]: https://github.com/udoprog/relative-path/pull/15
 [#14]: https://github.com/udoprog/relative-path/pull/14
 
-[Unreleased]: https://github.com/udoprog/relative-path/compare/1.7.3...master
+[Unreleased]: https://github.com/udoprog/relative-path/compare/1.8.0...master
+[1.8.0]: https://github.com/udoprog/relative-path/compare/1.7.3...1.8.0
 [1.7.3]: https://github.com/udoprog/relative-path/compare/1.7.2...1.7.3
+[1.7.2]: https://github.com/udoprog/relative-path/compare/1.7.1...1.7.2
 [1.7.1]: https://github.com/udoprog/relative-path/compare/1.7.0...1.7.1
 [1.7.0]: https://github.com/udoprog/relative-path/compare/1.6.1...1.7.0
 [1.6.1]: https://github.com/udoprog/relative-path/compare/1.6.0...1.6.1

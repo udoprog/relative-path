@@ -390,6 +390,36 @@ impl<'a> Component<'a> {
     }
 }
 
+/// [AsRef<RelativePath>] implementation for [Component].
+///
+/// # Examples
+///
+/// ```
+/// use relative_path::RelativePath;
+///
+/// let mut it = RelativePath::new("../foo/bar").components();
+///
+/// let a = it.next().ok_or("a")?;
+/// let b = it.next().ok_or("b")?;
+/// let c = it.next().ok_or("c")?;
+///
+/// let a: &RelativePath = a.as_ref();
+/// let b: &RelativePath = b.as_ref();
+/// let c: &RelativePath = c.as_ref();
+///
+/// assert_eq!(a, "..");
+/// assert_eq!(b, "foo");
+/// assert_eq!(c, "bar");
+///
+/// # Ok::<_, Box<dyn std::error::Error>>(())
+/// ```
+impl AsRef<RelativePath> for Component<'_> {
+    #[inline]
+    fn as_ref(&self) -> &RelativePath {
+        self.as_str().as_ref()
+    }
+}
+
 /// Traverse the given components and apply to the provided stack.
 ///
 /// This takes '.', and '..' into account. Where '.' doesn't change the stack, and '..' pops the
@@ -910,12 +940,14 @@ impl Hash for RelativePathBuf {
 }
 
 impl<P: AsRef<RelativePath>> Extend<P> for RelativePathBuf {
+    #[inline]
     fn extend<I: IntoIterator<Item = P>>(&mut self, iter: I) {
         iter.into_iter().for_each(move |p| self.push(p.as_ref()));
     }
 }
 
 impl<P: AsRef<RelativePath>> FromIterator<P> for RelativePathBuf {
+    #[inline]
     fn from_iter<I: IntoIterator<Item = P>>(iter: I) -> RelativePathBuf {
         let mut buf = RelativePathBuf::new();
         buf.extend(iter);

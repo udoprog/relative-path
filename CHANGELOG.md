@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Deserialize implementation and conversions for `Box<RelativePath>`.
 * `From<&str>`, `From<Box<str>>`, for `Box<RelativePath>`.
 * Added tests for most trait implementations.
+* Add `Deserialize` implementation for `&RelativePath` (#19).
+* Add `AsRef<RelativePath>` for `Component` (#24).
 
 ## [1.7.3] - 2023-01-02
 

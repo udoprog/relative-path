@@ -25,7 +25,7 @@
 //! Add the following to your `Cargo.toml`:
 //!
 //! ```toml
-//! relative-path = "1.7.3"
+//! relative-path = "1.8.0"
 //! ```
 //!
 //! <br>
@@ -1646,25 +1646,71 @@ impl RelativePath {
     }
 
     /// Check if path starts with a path separator.
+    #[inline]
     fn starts_with_sep(&self) -> bool {
         self.inner.starts_with(SEP)
     }
 
     /// Check if path ends with a path separator.
+    #[inline]
     fn ends_with_sep(&self) -> bool {
         self.inner.ends_with(SEP)
     }
 }
 
-impl From<&RelativePath> for Box<RelativePath> {
+/// Conversion from a [Box<str>] reference to a [Box<RelativePath>].
+///
+/// # Examples
+///
+/// ```
+/// use relative_path::RelativePath;
+///
+/// let path: Box<RelativePath> = Box::<str>::from("foo/bar").into();
+/// assert_eq!(&*path, "foo/bar");
+/// ```
+impl From<Box<str>> for Box<RelativePath> {
     #[inline]
-    fn from(path: &RelativePath) -> Box<RelativePath> {
-        let boxed: Box<str> = path.inner.into();
+    fn from(boxed: Box<str>) -> Box<RelativePath> {
         let rw = Box::into_raw(boxed) as *mut RelativePath;
         unsafe { Box::from_raw(rw) }
     }
 }
 
+/// Conversion from a [str] reference to a [Box<RelativePath>].
+///
+/// # Examples
+///
+/// ```
+/// use relative_path::RelativePath;
+///
+/// let path: Box<RelativePath> = "foo/bar".into();
+/// assert_eq!(&*path, "foo/bar");
+///
+/// let path: Box<RelativePath> = RelativePath::new("foo/bar").into();
+/// assert_eq!(&*path, "foo/bar");
+/// ```
+impl<T> From<&T> for Box<RelativePath>
+where
+    T: ?Sized + AsRef<str>,
+{
+    #[inline]
+    fn from(path: &T) -> Box<RelativePath> {
+        Box::<RelativePath>::from(Box::<str>::from(path.as_ref()))
+    }
+}
+
+/// Conversion from [RelativePathBuf] to [Box<RelativePath>].
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::Arc;
+/// use relative_path::{RelativePath, RelativePathBuf};
+///
+/// let path = RelativePathBuf::from("foo/bar");
+/// let path: Box<RelativePath> = path.into();
+/// assert_eq!(&*path, "foo/bar");
+/// ```
 impl From<RelativePathBuf> for Box<RelativePath> {
     #[inline]
     fn from(path: RelativePathBuf) -> Box<RelativePath> {
@@ -1674,12 +1720,35 @@ impl From<RelativePathBuf> for Box<RelativePath> {
     }
 }
 
+/// Clone implementation for [Box<RelativePath>].
+///
+/// # Examples
+///
+/// ```
+/// use relative_path::RelativePath;
+///
+/// let path: Box<RelativePath> = RelativePath::new("foo/bar").into();
+/// let path2 = path.clone();
+/// assert_eq!(&*path, &*path2);
+/// ```
 impl Clone for Box<RelativePath> {
+    #[inline]
     fn clone(&self) -> Self {
         self.to_relative_path_buf().into_boxed_relative_path()
     }
 }
 
+/// Conversion from [RelativePath] to [Arc<RelativePath>].
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::Arc;
+/// use relative_path::RelativePath;
+///
+/// let path: Arc<RelativePath> = RelativePath::new("foo/bar").into();
+/// assert_eq!(&*path, "foo/bar");
+/// ```
 impl From<&RelativePath> for Arc<RelativePath> {
     #[inline]
     fn from(path: &RelativePath) -> Arc<RelativePath> {
@@ -1689,6 +1758,18 @@ impl From<&RelativePath> for Arc<RelativePath> {
     }
 }
 
+/// Conversion from [RelativePathBuf] to [Arc<RelativePath>].
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::Arc;
+/// use relative_path::{RelativePath, RelativePathBuf};
+///
+/// let path = RelativePathBuf::from("foo/bar");
+/// let path: Arc<RelativePath> = path.into();
+/// assert_eq!(&*path, "foo/bar");
+/// ```
 impl From<RelativePathBuf> for Arc<RelativePath> {
     #[inline]
     fn from(path: RelativePathBuf) -> Arc<RelativePath> {
@@ -1698,6 +1779,17 @@ impl From<RelativePathBuf> for Arc<RelativePath> {
     }
 }
 
+/// Conversion from [RelativePathBuf] to [Arc<RelativePath>].
+///
+/// # Examples
+///
+/// ```
+/// use std::rc::Rc;
+/// use relative_path::RelativePath;
+///
+/// let path: Rc<RelativePath> = RelativePath::new("foo/bar").into();
+/// assert_eq!(&*path, "foo/bar");
+/// ```
 impl From<&RelativePath> for Rc<RelativePath> {
     #[inline]
     fn from(path: &RelativePath) -> Rc<RelativePath> {
@@ -1707,6 +1799,18 @@ impl From<&RelativePath> for Rc<RelativePath> {
     }
 }
 
+/// Conversion from [RelativePathBuf] to [Rc<RelativePath>].
+///
+/// # Examples
+///
+/// ```
+/// use std::rc::Rc;
+/// use relative_path::{RelativePath, RelativePathBuf};
+///
+/// let path = RelativePathBuf::from("foo/bar");
+/// let path: Rc<RelativePath> = path.into();
+/// assert_eq!(&*path, "foo/bar");
+/// ```
 impl From<RelativePathBuf> for Rc<RelativePath> {
     #[inline]
     fn from(path: RelativePathBuf) -> Rc<RelativePath> {
@@ -1716,45 +1820,94 @@ impl From<RelativePathBuf> for Rc<RelativePath> {
     }
 }
 
+/// [ToOwned] implementation for [RelativePath].
+///
+/// # Examples
+///
+/// ```
+/// use relative_path::RelativePath;
+///
+/// let path = RelativePath::new("foo/bar").to_owned();
+/// assert_eq!(path, "foo/bar");
+/// ```
 impl ToOwned for RelativePath {
     type Owned = RelativePathBuf;
 
+    #[inline]
     fn to_owned(&self) -> RelativePathBuf {
         self.to_relative_path_buf()
     }
 }
 
 impl fmt::Debug for RelativePath {
+    #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "{:?}", &self.inner)
     }
 }
 
+/// [AsRef<str>] implementation for [RelativePathBuf].
+///
+/// # Examples
+///
+/// ```
+/// use relative_path::RelativePathBuf;
+///
+/// let path = RelativePathBuf::from("foo/bar");
+/// let string: &str = path.as_ref();
+/// assert_eq!(string, "foo/bar");
+/// ```
 impl AsRef<str> for RelativePathBuf {
+    #[inline]
     fn as_ref(&self) -> &str {
         &self.inner
     }
 }
 
+/// [AsRef<RelativePath>] implementation for [String].
+///
+/// # Examples
+///
+/// ```
+/// use relative_path::RelativePath;
+///
+/// let path: String = format!("foo/bar");
+/// let path: &RelativePath = path.as_ref();
+/// assert_eq!(path, "foo/bar");
+/// ```
 impl AsRef<RelativePath> for String {
+    #[inline]
     fn as_ref(&self) -> &RelativePath {
         RelativePath::new(self)
     }
 }
 
+/// [AsRef<RelativePath>] implementation for [str].
+///
+/// # Examples
+///
+/// ```
+/// use relative_path::RelativePath;
+///
+/// let path: &RelativePath = "foo/bar".as_ref();
+/// assert_eq!(path, RelativePath::new("foo/bar"));
+/// ```
 impl AsRef<RelativePath> for str {
+    #[inline]
     fn as_ref(&self) -> &RelativePath {
         RelativePath::new(self)
     }
 }
 
 impl AsRef<RelativePath> for RelativePath {
+    #[inline]
     fn as_ref(&self) -> &RelativePath {
         self
     }
 }
 
 impl cmp::PartialEq for RelativePath {
+    #[inline]
     fn eq(&self, other: &RelativePath) -> bool {
         self.components() == other.components()
     }
@@ -1763,18 +1916,21 @@ impl cmp::PartialEq for RelativePath {
 impl cmp::Eq for RelativePath {}
 
 impl cmp::PartialOrd for RelativePath {
+    #[inline]
     fn partial_cmp(&self, other: &RelativePath) -> Option<cmp::Ordering> {
         self.components().partial_cmp(other.components())
     }
 }
 
 impl cmp::Ord for RelativePath {
+    #[inline]
     fn cmp(&self, other: &RelativePath) -> cmp::Ordering {
         self.components().cmp(other.components())
     }
 }
 
 impl Hash for RelativePath {
+    #[inline]
     fn hash<H: Hasher>(&self, h: &mut H) {
         for c in self.components() {
             c.hash(h);
@@ -1783,12 +1939,14 @@ impl Hash for RelativePath {
 }
 
 impl fmt::Display for RelativePath {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.inner, f)
     }
 }
 
 impl fmt::Display for RelativePathBuf {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.inner, f)
     }
@@ -1807,19 +1965,33 @@ pub struct Display<'a> {
 }
 
 impl<'a> fmt::Debug for Display<'a> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&self.path, f)
     }
 }
 
 impl<'a> fmt::Display for Display<'a> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.path, f)
     }
 }
 
+/// [serde::ser::Serialize] implementation for [RelativePathBuf].
+///
+/// ```
+/// use serde::Serialize;
+/// use relative_path::RelativePathBuf;
+///
+/// #[derive(Serialize)]
+/// struct Document {
+///     path: RelativePathBuf,
+/// }
+/// ```
 #[cfg(feature = "serde")]
 impl serde::ser::Serialize for RelativePathBuf {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
@@ -1828,21 +2000,34 @@ impl serde::ser::Serialize for RelativePathBuf {
     }
 }
 
+/// [serde::de::Deserialize] implementation for [RelativePathBuf].
+///
+/// ```
+/// use serde::Deserialize;
+/// use relative_path::RelativePathBuf;
+///
+/// #[derive(Deserialize)]
+/// struct Document {
+///     path: RelativePathBuf,
+/// }
+/// ```
 #[cfg(feature = "serde")]
 impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::de::Deserializer<'de>,
     {
-        struct RelativePathBufVisitor;
+        struct Visitor;
 
-        impl<'de> serde::de::Visitor<'de> for RelativePathBufVisitor {
+        impl<'de> serde::de::Visitor<'de> for Visitor {
             type Value = RelativePathBuf;
 
+            #[inline]
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a relative path")
             }
 
+            #[inline]
             fn visit_string<E>(self, input: String) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
@@ -1850,6 +2035,7 @@ impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
                 Ok(RelativePathBuf::from(input))
             }
 
+            #[inline]
             fn visit_str<E>(self, input: &str) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
@@ -1858,12 +2044,72 @@ impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
             }
         }
 
-        deserializer.deserialize_any(RelativePathBufVisitor)
+        deserializer.deserialize_any(Visitor)
     }
 }
 
+/// [serde::de::Deserialize] implementation for [Box<RelativePath>].
+///
+/// ```
+/// use serde::Deserialize;
+/// use relative_path::RelativePath;
+///
+/// #[derive(Deserialize)]
+/// struct Document {
+///     path: Box<RelativePath>,
+/// }
+/// ```
+#[cfg(feature = "serde")]
+impl<'de> serde::de::Deserialize<'de> for Box<RelativePath> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = Box<RelativePath>;
+
+            #[inline]
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a relative path")
+            }
+
+            #[inline]
+            fn visit_string<E>(self, input: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Box::<RelativePath>::from(input.into_boxed_str()))
+            }
+
+            #[inline]
+            fn visit_str<E>(self, input: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Box::<RelativePath>::from(input))
+            }
+        }
+
+        deserializer.deserialize_any(Visitor)
+    }
+}
+
+/// [serde::ser::Serialize] implementation for [RelativePath].
+///
+/// ```
+/// use serde::Serialize;
+/// use relative_path::RelativePath;
+///
+/// #[derive(Serialize)]
+/// struct Document<'a> {
+///     path: &'a RelativePath,
+/// }
+/// ```
 #[cfg(feature = "serde")]
 impl serde::ser::Serialize for RelativePath {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,

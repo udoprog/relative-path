@@ -22,10 +22,25 @@
 //!
 //! ## Usage
 //!
-//! Add the following to your `Cargo.toml`:
+//! Add `relative-path` to your `Cargo.toml`:
 //!
 //! ```toml
 //! relative-path = "1.8.0"
+//! ```
+//!
+//! Start using relative paths:
+//!
+//! ```
+//! use serde::{Serialize, Deserialize};
+//! use relative_path::RelativePath;
+//!
+//! #[derive(Serialize, Deserialize)]
+//! struct Manifest<'a> {
+//!     #[serde(borrow)]
+//!     source: &'a RelativePath,
+//! }
+//!
+//! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! <br>
@@ -2044,7 +2059,7 @@ impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
             }
         }
 
-        deserializer.deserialize_any(Visitor)
+        deserializer.deserialize_str(Visitor)
     }
 }
 
@@ -2092,7 +2107,59 @@ impl<'de> serde::de::Deserialize<'de> for Box<RelativePath> {
             }
         }
 
-        deserializer.deserialize_any(Visitor)
+        deserializer.deserialize_str(Visitor)
+    }
+}
+
+/// [serde::de::Deserialize] implementation for a [RelativePath] reference.
+///
+/// ```
+/// use serde::Deserialize;
+/// use relative_path::RelativePath;
+///
+/// #[derive(Deserialize)]
+/// struct Document<'a> {
+///     #[serde(borrow)]
+///     path: &'a RelativePath,
+/// }
+/// ```
+#[cfg(feature = "serde")]
+impl<'de: 'a, 'a> serde::de::Deserialize<'de> for &'a RelativePath {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'a> serde::de::Visitor<'a> for Visitor {
+            type Value = &'a RelativePath;
+
+            #[inline]
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a borrowed relative path")
+            }
+
+            #[inline]
+            fn visit_borrowed_str<E>(self, v: &'a str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(RelativePath::new(v))
+            }
+
+            #[inline]
+            fn visit_borrowed_bytes<E>(self, v: &'a [u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                let string = str::from_utf8(v).map_err(|_| {
+                    serde::de::Error::invalid_value(serde::de::Unexpected::Bytes(v), &self)
+                })?;
+                Ok(RelativePath::new(string))
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
     }
 }
 

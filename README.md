@@ -24,10 +24,24 @@ across platforms.
 
 ## Usage
 
-Add the following to your `Cargo.toml`:
+Add `relative-path` to your `Cargo.toml`:
 
 ```toml
 relative-path = "1.8.0"
+```
+
+Start using relative paths:
+
+```rust
+use serde::{Serialize, Deserialize};
+use relative_path::RelativePath;
+
+#[derive(Serialize, Deserialize)]
+struct Manifest<'a> {
+    #[serde(borrow)]
+    source: &'a RelativePath,
+}
+
 ```
 
 <br>

@@ -21,6 +21,9 @@ jobs:
     - run: cargo test --workspace --all-targets
     - run: cargo test --workspace --all-targets --all-features
     - run: cargo test --workspace --all-targets --no-default-features
+    - run: cargo test --workspace --doc
+    - run: cargo test --workspace --doc --all-features
+    - run: cargo test --workspace --doc --no-default-features
 
   clippy:
     runs-on: ubuntu-latest

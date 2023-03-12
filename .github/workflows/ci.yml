@@ -7,16 +7,35 @@ on:
       - main
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
+  test:
+    runs-on: ${{matrix.os}}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        toolchain: ["1.56.0", stable]
+        toolchain: ["1.56", stable]
     steps:
     - uses: actions/checkout@v3
-    - run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal
-    - run: rustup default ${{ matrix.toolchain }}
-    - run: cargo build --no-default-features
-    - run: cargo build --all-features
-    - run: cargo test --all-features
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{matrix.toolchain}}
+    - run: cargo test --workspace --all-targets
+    - run: cargo test --workspace --all-targets --all-features
+    - run: cargo test --workspace --all-targets --no-default-features
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@1.56
+      with:
+        components: clippy
+    - run: cargo clippy --workspace --all-features --all-targets -- -D warnings
+
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
+    - run: cargo fmt --check --all

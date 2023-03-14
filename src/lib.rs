@@ -1432,14 +1432,8 @@ impl RelativePath {
     /// ```
     pub fn is_normalized(&self) -> bool {
         self.components()
-            .skip_while(|c| match c {
-                Component::ParentDir => true,
-                _ => false,
-            })
-            .all(|c| match c {
-                Component::Normal(_) => true,
-                _ => false,
-            })
+            .skip_while(|c| matches!(c, Component::ParentDir))
+            .all(|c| matches!(c, Component::Normal(_)))
     }
 
     /// Creates an owned [`RelativePathBuf`] like `self` but with the given file

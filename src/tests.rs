@@ -83,6 +83,7 @@ fn rp(input: &str) -> &RelativePath {
 }
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 pub fn test_decompositions() {
     t!("",
     iter: [],
@@ -420,6 +421,7 @@ fn test_eq_recievers() {
 }
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 pub fn test_compare() {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};

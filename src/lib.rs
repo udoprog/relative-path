@@ -276,7 +276,6 @@
 // cb2a656cdfb6400ac0200c661267f91fabf237e2 src/libstd/path.rs
 
 #![deny(missing_docs)]
-#![deny(rustdoc::broken_intra_doc_links)]
 
 #[cfg(test)]
 mod tests;
@@ -1433,8 +1432,14 @@ impl RelativePath {
     /// ```
     pub fn is_normalized(&self) -> bool {
         self.components()
-            .skip_while(|c| matches!(c, Component::ParentDir))
-            .all(|c| matches!(c, Component::Normal(_)))
+            .skip_while(|c| match c {
+                Component::ParentDir => true,
+                _ => false,
+            })
+            .all(|c| match c {
+                Component::Normal(_) => true,
+                _ => false,
+            })
     }
 
     /// Creates an owned [`RelativePathBuf`] like `self` but with the given file

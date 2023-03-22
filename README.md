@@ -27,7 +27,7 @@ across platforms.
 Add `relative-path` to your `Cargo.toml`:
 
 ```toml
-relative-path = "1.8.0"
+relative-path = "1.8.1"
 ```
 
 Start using relative paths:

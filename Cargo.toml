@@ -17,7 +17,7 @@ categories = ["filesystem"]
 default = []
 
 [dependencies]
-serde = { version = "1.0", optional = true }
+serde = { version = "1.0.160", optional = true }
 
 [dev-dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0.160", features = ["derive"] }

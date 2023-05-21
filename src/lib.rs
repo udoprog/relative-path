@@ -296,7 +296,11 @@ const STEM_SEP: char = '.';
 const CURRENT_STR: &str = ".";
 const PARENT_STR: &str = "..";
 
-const SEP: char = '/';
+if cfg!(target_os = "windows") {
+    const SEP: char = "\\";
+} else {
+    const SEP: char = '/';
+}
 
 fn split_file_at_dot(input: &str) -> (Option<&str>, Option<&str>) {
     if input == PARENT_STR {

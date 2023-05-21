@@ -297,7 +297,7 @@ const CURRENT_STR: &str = ".";
 const PARENT_STR: &str = "..";
 
 #[cfg(target_os = "windows")]
-    const SEP: char = '\';
+    const SEP: char = '\\';
 #[cfg(not(target_os = "windows"))]
     const SEP: char = '/';
 

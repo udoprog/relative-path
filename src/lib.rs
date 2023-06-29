@@ -235,6 +235,9 @@
 //! * Windows has a number of [reserved characters and names][windows-reserved]
 //!   (like `CON`, `PRN`, and `AUX`) which cannot legally be part of a
 //!   filesystem component.
+//! * Windows paths are [case-insensitive by default][windows-case]. So,
+//!   `Foo.txt` and `foo.txt` are the same files on windows. But they are
+//!   considered different paths on most unix systems.
 //!
 //! A relative path that *accidentally* contains a platform-specific components
 //! will largely result in a nonsensical paths being generated in the hope that
@@ -269,6 +272,7 @@
 //! [`to_logical_path`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_logical_path
 //! [`to_path`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path
 //! [windows-reserved]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
+//! [windows-case]: https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity
 
 // This file contains parts that are Copyright 2015 The Rust Project Developers, copied from:
 // https://github.com/rust-lang/rust

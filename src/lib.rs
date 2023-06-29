@@ -235,7 +235,7 @@
 //! * Windows has a number of [reserved characters and names][windows-reserved]
 //!   (like `CON`, `PRN`, and `AUX`) which cannot legally be part of a
 //!   filesystem component.
-//! * Windows paths are [case-insensitive by default][windows-case]. So, 
+//! * Windows paths are [case-insensitive by default][windows-case]. So,
 //!   `Foo.txt` and `foo.txt` are the same files on windows. But they are
 //!   considered different paths on most unix systems.
 //!

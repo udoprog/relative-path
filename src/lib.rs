@@ -244,7 +244,7 @@
 //! they will fail fast during development and testing.
 //!
 //! ```rust
-//! use relative_path::RelativePath;
+//! use relative_path::{RelativePath, PathExt};
 //! use std::path::Path;
 //!
 //! if cfg!(windows) {
@@ -258,6 +258,10 @@
 //!     assert_eq!(
 //!         Path::new("foo/bar/baz"),
 //!         RelativePath::new("/bar/baz").to_path("foo")
+//!     );
+//!     assert_eq!(
+//!         Path::new("foo").relative_to("bar").unwrap(),
+//!         RelativePath::new("../foo"),
 //!     );
 //! }
 //! ```
@@ -280,8 +284,12 @@
 
 #![deny(missing_docs)]
 
+mod relative;
+
 #[cfg(test)]
 mod tests;
+
+pub use relative::PathExt;
 
 use std::borrow::{Borrow, Cow};
 use std::cmp;

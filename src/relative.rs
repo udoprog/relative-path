@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-// Taken from the pathdiff crate, which adapted the original rustc's path_relative_from
+// Ported from the pathdiff crate, which adapted the original rustc's path_relative_from
 // https://github.com/Manishearth/pathdiff/blob/master/src/lib.rs
 // https://github.com/rust-lang/rust/blob/e1d0de82cc40b666b88d4a6d2c9dcbc81d7ed27f/src/librustc_back/rpath.rs#L116-L158
 
@@ -16,12 +16,17 @@ use std::path::{self, Path, PathBuf};
 
 use crate::{Component, FromPathError, FromPathErrorKind, RelativePathBuf};
 
-/// Provides helper methods on Path and PathBuf to for creating RelativePath.
+/// Extension methods for [`Path`] and [`PathBuf`] to for building and
+/// interacting with [`RelativePath`].
+///
+/// [`RelativePath`]: crate::RelativePath
 pub trait PathExt: private::Sealed {
-    /// Make a relative path from a provided root directory path.
+    /// Build a relative path from the provided directory to `self`.
     ///
-    /// This may not function correctly if either path includes a symlink.
-    /// Resolve or discard symlink paths before making them relative.
+    /// Producing a relative path like this is a logical operation and does not
+    /// guarantee that the constructed path corresponds to what the filesystem
+    /// would do. On Linux for example symbolic links could mean that the
+    /// logical path doesn't correspond to the filesystem path.
     ///
     /// # Examples
     ///

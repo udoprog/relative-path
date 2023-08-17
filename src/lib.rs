@@ -400,7 +400,7 @@ impl<'a> Component<'a> {
     }
 }
 
-/// [AsRef<RelativePath>] implementation for [Component].
+/// [`AsRef<RelativePath>`] implementation for [`Component`].
 ///
 /// # Examples
 ///
@@ -1572,9 +1572,10 @@ impl RelativePath {
     /// path like `foo/../bar` might reference a different location other than
     /// `./bar`.
     ///
-    /// Normalization is a logical operation that is only valid if the relative
-    /// path is part of some context which doesn't have semantics that causes it
-    /// to break, like symbolic links.
+    /// Normalization is a logical operation and does not guarantee that the
+    /// constructed path corresponds to what the filesystem would do. On Linux
+    /// for example symbolic links could mean that the logical path doesn't
+    /// correspond to the filesystem path.
     ///
     /// # Examples
     ///
@@ -1715,7 +1716,7 @@ impl RelativePath {
     }
 }
 
-/// Conversion from a [Box<str>] reference to a [Box<RelativePath>].
+/// Conversion from a [`Box<str>`] reference to a [`Box<RelativePath>`].
 ///
 /// # Examples
 ///
@@ -1733,7 +1734,9 @@ impl From<Box<str>> for Box<RelativePath> {
     }
 }
 
-/// Conversion from a [str] reference to a [Box<RelativePath>].
+/// Conversion from a [`str`] reference to a [`Box<RelativePath>`].
+///
+/// [`str`]: prim@str
 ///
 /// # Examples
 ///
@@ -1756,7 +1759,7 @@ where
     }
 }
 
-/// Conversion from [RelativePathBuf] to [Box<RelativePath>].
+/// Conversion from [`RelativePathBuf`] to [`Box<RelativePath>`].
 ///
 /// # Examples
 ///
@@ -1777,7 +1780,7 @@ impl From<RelativePathBuf> for Box<RelativePath> {
     }
 }
 
-/// Clone implementation for [Box<RelativePath>].
+/// Clone implementation for [`Box<RelativePath>`].
 ///
 /// # Examples
 ///
@@ -1795,7 +1798,7 @@ impl Clone for Box<RelativePath> {
     }
 }
 
-/// Conversion from [RelativePath] to [Arc<RelativePath>].
+/// Conversion from [RelativePath] to [`Arc<RelativePath>`].
 ///
 /// # Examples
 ///
@@ -1815,7 +1818,7 @@ impl From<&RelativePath> for Arc<RelativePath> {
     }
 }
 
-/// Conversion from [RelativePathBuf] to [Arc<RelativePath>].
+/// Conversion from [`RelativePathBuf`] to [`Arc<RelativePath>`].
 ///
 /// # Examples
 ///
@@ -1836,7 +1839,7 @@ impl From<RelativePathBuf> for Arc<RelativePath> {
     }
 }
 
-/// Conversion from [RelativePathBuf] to [Arc<RelativePath>].
+/// Conversion from [`RelativePathBuf`] to [`Arc<RelativePath>`].
 ///
 /// # Examples
 ///
@@ -1856,7 +1859,7 @@ impl From<&RelativePath> for Rc<RelativePath> {
     }
 }
 
-/// Conversion from [RelativePathBuf] to [Rc<RelativePath>].
+/// Conversion from [`RelativePathBuf`] to [`Rc<RelativePath>`].
 ///
 /// # Examples
 ///
@@ -1877,7 +1880,7 @@ impl From<RelativePathBuf> for Rc<RelativePath> {
     }
 }
 
-/// [ToOwned] implementation for [RelativePath].
+/// [`ToOwned`] implementation for [`RelativePath`].
 ///
 /// # Examples
 ///
@@ -1903,7 +1906,7 @@ impl fmt::Debug for RelativePath {
     }
 }
 
-/// [AsRef<str>] implementation for [RelativePathBuf].
+/// [`AsRef<str>`] implementation for [`RelativePathBuf`].
 ///
 /// # Examples
 ///
@@ -1921,7 +1924,7 @@ impl AsRef<str> for RelativePathBuf {
     }
 }
 
-/// [AsRef<RelativePath>] implementation for [String].
+/// [`AsRef<RelativePath>`] implementation for [String].
 ///
 /// # Examples
 ///
@@ -1939,7 +1942,9 @@ impl AsRef<RelativePath> for String {
     }
 }
 
-/// [AsRef<RelativePath>] implementation for [str].
+/// [`AsRef<RelativePath>`] implementation for [`str`].
+///
+/// [`str`]: prim@str
 ///
 /// # Examples
 ///
@@ -2035,7 +2040,7 @@ impl<'a> fmt::Display for Display<'a> {
     }
 }
 
-/// [serde::ser::Serialize] implementation for [RelativePathBuf].
+/// [serde::ser::Serialize] implementation for [`RelativePathBuf`].
 ///
 /// ```
 /// use serde::Serialize;
@@ -2057,7 +2062,7 @@ impl serde::ser::Serialize for RelativePathBuf {
     }
 }
 
-/// [serde::de::Deserialize] implementation for [RelativePathBuf].
+/// [`serde::de::Deserialize`] implementation for [`RelativePathBuf`].
 ///
 /// ```
 /// use serde::Deserialize;
@@ -2105,7 +2110,7 @@ impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
     }
 }
 
-/// [serde::de::Deserialize] implementation for [Box<RelativePath>].
+/// [`serde::de::Deserialize`] implementation for [`Box<RelativePath>`].
 ///
 /// ```
 /// use serde::Deserialize;
@@ -2153,7 +2158,7 @@ impl<'de> serde::de::Deserialize<'de> for Box<RelativePath> {
     }
 }
 
-/// [serde::de::Deserialize] implementation for a [RelativePath] reference.
+/// [`serde::de::Deserialize`] implementation for a [RelativePath] reference.
 ///
 /// ```
 /// use serde::Deserialize;

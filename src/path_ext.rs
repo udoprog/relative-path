@@ -29,17 +29,36 @@ pub struct RelativeToError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 enum RelativeToErrorKind {
-    /// Non-relative component in path.
-    NonRelative,
     /// Non-utf8 component in path.
     NonUtf8,
+    /// Mismatching path prefixes.
+    PrefixMismatch,
+    /// A provided path is ambiguous, in that there is no way to determine which
+    /// components should be added from one path to the other to traverse it.
+    ///
+    /// For example, `.` is ambiguous relative to `../..` because we don't know
+    /// the names of the components being traversed.
+    AmbiguousTraversal,
+    /// This is a catch-all error since we don't control the `std::path` API a
+    /// Components iterator might decide (intentionally or not) to produce
+    /// components which violates its own contract.
+    ///
+    /// In particular we rely on only relative components being produced after
+    /// the absolute prefix has been consumed.
+    IllegalComponent,
 }
 
 impl fmt::Display for RelativeToError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self.kind {
-            RelativeToErrorKind::NonRelative => "path contains non-relative component".fmt(fmt),
             RelativeToErrorKind::NonUtf8 => "path contains non-utf8 component".fmt(fmt),
+            RelativeToErrorKind::PrefixMismatch => {
+                "paths contain different absolute prefixes".fmt(fmt)
+            }
+            RelativeToErrorKind::AmbiguousTraversal => {
+                "path traversal cannot be determined".fmt(fmt)
+            }
+            RelativeToErrorKind::IllegalComponent => "path contains illegal components".fmt(fmt),
         }
     }
 }
@@ -96,7 +115,7 @@ impl PathExt for Path {
                 CurDir => Component::CurDir,
                 ParentDir => Component::ParentDir,
                 Normal(n) => Component::Normal(n.to_str().ok_or(RelativeToErrorKind::NonUtf8)?),
-                _ => return Err(RelativeToErrorKind::NonRelative.into()),
+                _ => return Err(RelativeToErrorKind::IllegalComponent.into()),
             })
         }
 
@@ -113,7 +132,7 @@ impl PathExt for Path {
                 (Some(RootDir), Some(RootDir)) => (),
                 (Some(Prefix(a)), Some(Prefix(b))) if a == b => (),
                 (Some(Prefix(_) | RootDir), _) | (_, Some(Prefix(_) | RootDir)) => {
-                    return Err(RelativeToErrorKind::NonRelative.into());
+                    return Err(RelativeToErrorKind::PrefixMismatch.into());
                 }
                 (None, None) => break (None, None),
                 (a, b) if a != b => break (a, b),
@@ -140,7 +159,7 @@ impl PathExt for Path {
             match b_it.next() {
                 Some(CurDir) => buf.push(std_to_c(a)?),
                 Some(ParentDir) => {
-                    return Err(RelativeToErrorKind::NonRelative.into());
+                    return Err(RelativeToErrorKind::AmbiguousTraversal.into());
                 }
                 root => {
                     if root.is_some() {
@@ -151,7 +170,7 @@ impl PathExt for Path {
                         match comp {
                             ParentDir => {
                                 if !buf.pop() {
-                                    return Err(RelativeToErrorKind::NonRelative.into());
+                                    return Err(RelativeToErrorKind::AmbiguousTraversal.into());
                                 }
                             }
                             CurDir => (),
@@ -183,15 +202,17 @@ impl PathExt for PathBuf {
 
 // Prevent downstream implementations, so methods may be added without backwards breaking changes.
 mod private {
-    pub trait Sealed {}
-}
+    use std::path::{Path, PathBuf};
 
-impl private::Sealed for Path {}
-impl private::Sealed for PathBuf {}
+    pub trait Sealed {}
+
+    impl Sealed for Path {}
+    impl Sealed for PathBuf {}
+}
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
     use crate::RelativeToError;
 
@@ -201,7 +222,7 @@ mod tests {
     macro_rules! assert_diff_paths {
         ($path:expr, $base:expr, $expected:expr $(,)?) => {
             assert_eq!(
-                PathBuf::from($path).relative_to(Path::new($base)),
+                Path::new($path).relative_to($base),
                 Result::<&str, RelativeToError>::map($expected, |s| s.into())
             );
         };
@@ -211,11 +232,16 @@ mod tests {
     #[cfg(windows)]
     fn test_different_prefixes() {
         assert_diff_paths!(
-            "C:/repo",
-            "D:/repo",
-            Err(RelativeToErrorKind::NonRelative.into()),
+            "C:\\repo",
+            "D:\\repo",
+            Err(RelativeToErrorKind::PrefixMismatch.into()),
         );
-        assert_diff_paths!("C:/repo", "C:/repo", Ok(""));
+        assert_diff_paths!("C:\\repo", "C:\\repo", Ok(""));
+        assert_diff_paths!(
+            "\\\\server\\share\\repo",
+            "\\\\server2\\share\\repo",
+            Err(RelativeToErrorKind::PrefixMismatch.into()),
+        );
     }
 
     #[test]
@@ -236,12 +262,12 @@ mod tests {
         assert_diff_paths!(
             &abs("foo"),
             "bar",
-            Err(RelativeToErrorKind::NonRelative.into()),
+            Err(RelativeToErrorKind::PrefixMismatch.into()),
         );
         assert_diff_paths!(
             "foo",
             &abs("bar"),
-            Err(RelativeToErrorKind::NonRelative.into()),
+            Err(RelativeToErrorKind::PrefixMismatch.into()),
         );
     }
 
@@ -301,20 +327,27 @@ mod tests {
     #[test]
     fn assert_does_not_skip_parents() {
         assert_eq!(
-            PathBuf::from("some/path").relative_to(PathBuf::from("some/foo/baz/path")),
+            Path::new("some/path").relative_to("some/foo/baz/path"),
             Ok("../../../path".into())
         );
 
         assert_eq!(
-            PathBuf::from("some/path").relative_to(PathBuf::from("some/foo/bar/../baz/path")),
+            Path::new("some/path").relative_to("some/foo/bar/../baz/path"),
             Ok("../../../path".into())
         );
+    }
 
-        // Parent directory name is unknown, so trying to make current directory relative to it is
-        // impossible.
+    #[test]
+    fn test_ambiguous_paths() {
+        // Parent directory name is unknown, so trying to make current directory
+        // relative to it is impossible.
         assert_eq!(
-            PathBuf::from(".").relative_to(PathBuf::from("a/../..")),
-            Err(RelativeToErrorKind::NonRelative.into()),
+            Path::new(".").relative_to("../.."),
+            Err(RelativeToErrorKind::AmbiguousTraversal.into()),
+        );
+        assert_eq!(
+            Path::new(".").relative_to("a/../.."),
+            Err(RelativeToErrorKind::AmbiguousTraversal.into()),
         );
     }
 }

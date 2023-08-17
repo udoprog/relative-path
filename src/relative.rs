@@ -12,90 +12,134 @@
 // https://github.com/Manishearth/pathdiff/blob/master/src/lib.rs
 // https://github.com/rust-lang/rust/blob/e1d0de82cc40b666b88d4a6d2c9dcbc81d7ed27f/src/librustc_back/rpath.rs#L116-L158
 
-use crate::{FromPathError, FromPathErrorKind, RelativePathBuf};
-use std::path::*;
+use std::path::{self, Path, PathBuf};
+
+use crate::{Component, FromPathError, FromPathErrorKind, RelativePathBuf};
 
 /// Provides helper methods on Path and PathBuf to for creating RelativePath.
 pub trait PathExt: private::Sealed {
     /// Make a relative path from a provided root directory path.
     ///
-    /// This may not function correctly if either path includes a symlink. Resolve or discard
-    /// symlink paths before making them relative.
+    /// This may not function correctly if either path includes a symlink.
+    /// Resolve or discard symlink paths before making them relative.
     ///
-    /// ```rust
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
     /// use relative_path::PathExt;
-    /// use std::path::*;
     ///
     /// let baz = PathBuf::from("/foo/bar/baz");
     /// let bar = PathBuf::from("/foo/bar");
     /// let quux = PathBuf::from("/foo/bar/quux");
-    /// assert_eq!(bar.relative_to(&baz), Ok("../".into()));
-    /// assert_eq!(baz.relative_to(&bar), Ok("baz".into()));
-    /// assert_eq!(quux.relative_to(&baz), Ok("../quux".into()));
-    /// assert_eq!(baz.relative_to(&quux), Ok("../baz".into()));
-    /// assert_eq!(bar.relative_to(&quux), Ok("../".into()));
     ///
-    /// assert_eq!(baz.as_path().relative_to(&bar), Ok("baz".into()));
-    /// assert_eq!(baz.as_path().relative_to(bar.as_path()), Ok("baz".into()));
+    /// assert_eq!(bar.relative_to(&baz)?, "../");
+    /// assert_eq!(baz.relative_to(&bar)?, "baz");
+    /// assert_eq!(quux.relative_to(&baz)?, "../quux");
+    /// assert_eq!(baz.relative_to(&quux)?, "../baz");
+    /// assert_eq!(bar.relative_to(&quux)?, "../");
+    ///
+    /// assert_eq!(baz.as_path().relative_to(&bar)?, "baz");
+    /// assert_eq!(baz.as_path().relative_to(bar.as_path())?, "baz");
+    /// # Ok::<_, relative_path::FromPathError>(())
     /// ```
-    fn relative_to(&self, root: impl AsRef<Path>) -> Result<RelativePathBuf, FromPathError>;
+    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, FromPathError>;
 }
 
 impl PathExt for Path {
-    fn relative_to(&self, root: impl AsRef<Path>) -> Result<RelativePathBuf, FromPathError> {
+    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, FromPathError> {
+        use path::Component as C;
+
+        // Helper function to convert from a std::path::Component to a
+        // relative_path::Component.
+        fn std_to_c(c: C<'_>) -> Result<Component<'_>, FromPathError> {
+            Ok(match c {
+                C::CurDir => Component::CurDir,
+                C::ParentDir => Component::ParentDir,
+                C::Normal(n) => {
+                    Component::Normal(n.to_str().ok_or_else(|| FromPathErrorKind::NonUtf8)?)
+                }
+                _ => return Err(FromPathErrorKind::NonRelative.into()),
+            })
+        }
+
         let root = root.as_ref();
-        if self.is_absolute() != root.is_absolute() {
-            Err(FromPathErrorKind::NonRelative.into())
-        } else {
-            let mut path_comps = self.components();
-            let mut root_comps = root.components();
-            let mut comps: Vec<Component> = vec![];
-            loop {
-                match (path_comps.next(), root_comps.next()) {
-                    (None, None) => break,
-                    (Some(a), None) => {
-                        comps.push(a);
-                        comps.extend(path_comps.by_ref());
-                        break;
+        let mut a_it = self.components();
+        let mut b_it = root.components();
+
+        // Ensure that the two paths are both either relative, or have the same
+        // prefix. Strips any common prefix the two paths do have. Prefixes are
+        // platform dependent, but different prefixes would for example indicate
+        // paths for different drives on Windows.
+        let (a_head, b_head) = loop {
+            match (a_it.next(), b_it.next()) {
+                (Some(C::RootDir), Some(C::RootDir)) => (),
+                (Some(C::Prefix(a)), Some(C::Prefix(b))) if a == b => (),
+                (Some(C::Prefix(_) | C::RootDir), _) | (_, Some(C::Prefix(_) | C::RootDir)) => {
+                    return Err(FromPathErrorKind::NonRelative.into());
+                }
+                (None, None) => break (None, None),
+                (a, b) if a != b => break (a, b),
+                _ => (),
+            }
+        };
+
+        let mut a_it = a_head.into_iter().chain(a_it);
+        let mut b_it = b_head.into_iter().chain(b_it);
+        let mut buf = RelativePathBuf::new();
+
+        loop {
+            let a = match a_it.next() {
+                Some(a) => a,
+                None => {
+                    for _ in b_it {
+                        buf.push(Component::ParentDir);
                     }
-                    (None, _) => comps.push(Component::ParentDir),
-                    (Some(a), Some(b)) if comps.is_empty() && a == b => (),
-                    (Some(a), Some(b)) if b == Component::CurDir => comps.push(a),
-                    (Some(_), Some(b)) if b == Component::ParentDir => {
-                        return Err(FromPathErrorKind::NonRelative.into());
+
+                    break;
+                }
+            };
+
+            match b_it.next() {
+                Some(C::CurDir) => buf.push(std_to_c(a)?),
+                Some(C::ParentDir) => {
+                    return Err(FromPathErrorKind::NonRelative.into());
+                }
+                root => {
+                    if root.is_some() {
+                        buf.push(Component::ParentDir);
                     }
-                    (Some(a), Some(_)) => {
-                        comps.push(Component::ParentDir);
-                        for comp in root_comps {
-                            match comp {
-                                Component::ParentDir => {
-                                    comps.pop().ok_or(FromPathErrorKind::NonRelative)?;
+
+                    for comp in b_it {
+                        match comp {
+                            C::ParentDir => {
+                                if !buf.pop() {
+                                    return Err(FromPathErrorKind::NonRelative.into());
                                 }
-                                Component::CurDir => (),
-                                _ => comps.push(Component::ParentDir),
                             }
+                            C::CurDir => (),
+                            _ => buf.push(Component::ParentDir),
                         }
-                        comps.push(a);
-                        comps.extend(path_comps.by_ref());
-                        break;
                     }
+
+                    buf.push(std_to_c(a)?);
+
+                    for c in a_it {
+                        buf.push(std_to_c(c)?);
+                    }
+
+                    break;
                 }
             }
-
-            comps
-                .iter()
-                .map(|c| {
-                    c.as_os_str()
-                        .to_str()
-                        .ok_or_else(|| FromPathErrorKind::NonUtf8.into())
-                })
-                .collect()
         }
+
+        Ok(buf)
     }
 }
 
 impl PathExt for PathBuf {
-    fn relative_to(&self, root: impl AsRef<Path>) -> Result<RelativePathBuf, FromPathError> {
+    #[inline]
+    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, FromPathError> {
         self.as_path().relative_to(root)
     }
 }
@@ -110,12 +154,32 @@ impl private::Sealed for PathBuf {}
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     use crate::{FromPathError, FromPathErrorKind};
 
     use super::PathExt;
     use cfg_if::cfg_if;
+
+    macro_rules! assert_diff_paths {
+        ($path:expr, $base:expr, $expected:expr $(,)?) => {
+            assert_eq!(
+                PathBuf::from($path).relative_to(Path::new($base)),
+                Result::<&str, FromPathError>::map($expected, |s| s.into())
+            );
+        };
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn test_different_prefixes() {
+        assert_diff_paths!(
+            "C:/repo",
+            "D:/repo",
+            Err(FromPathErrorKind::NonRelative.into()),
+        );
+        assert_diff_paths!("C:/repo", "C:/repo", Ok(""));
+    }
 
     #[test]
     fn test_absolute() {
@@ -130,14 +194,14 @@ mod tests {
             }
         }
 
-        assert_diff_paths(&abs("foo"), &abs("bar"), Ok("../foo"));
-        assert_diff_paths("foo", "bar", Ok("../foo"));
-        assert_diff_paths(
+        assert_diff_paths!(&abs("foo"), &abs("bar"), Ok("../foo"));
+        assert_diff_paths!("foo", "bar", Ok("../foo"));
+        assert_diff_paths!(
             &abs("foo"),
             "bar",
             Err(FromPathErrorKind::NonRelative.into()),
         );
-        assert_diff_paths(
+        assert_diff_paths!(
             "foo",
             &abs("bar"),
             Err(FromPathErrorKind::NonRelative.into()),
@@ -146,62 +210,55 @@ mod tests {
 
     #[test]
     fn test_identity() {
-        assert_diff_paths(".", ".", Ok(""));
-        assert_diff_paths("../foo", "../foo", Ok(""));
-        assert_diff_paths("./foo", "./foo", Ok(""));
-        assert_diff_paths("/foo", "/foo", Ok(""));
-        assert_diff_paths("foo", "foo", Ok(""));
+        assert_diff_paths!(".", ".", Ok(""));
+        assert_diff_paths!("../foo", "../foo", Ok(""));
+        assert_diff_paths!("./foo", "./foo", Ok(""));
+        assert_diff_paths!("/foo", "/foo", Ok(""));
+        assert_diff_paths!("foo", "foo", Ok(""));
 
-        assert_diff_paths("../foo/bar/baz", "../foo/bar/baz", Ok(""));
-        assert_diff_paths("foo/bar/baz", "foo/bar/baz", Ok(""));
+        assert_diff_paths!("../foo/bar/baz", "../foo/bar/baz", Ok(""));
+        assert_diff_paths!("foo/bar/baz", "foo/bar/baz", Ok(""));
     }
 
     #[test]
     fn test_subset() {
-        assert_diff_paths("foo", "fo", Ok("../foo"));
-        assert_diff_paths("fo", "foo", Ok("../fo"));
+        assert_diff_paths!("foo", "fo", Ok("../foo"));
+        assert_diff_paths!("fo", "foo", Ok("../fo"));
     }
 
     #[test]
     fn test_empty() {
-        assert_diff_paths("", "", Ok(""));
-        assert_diff_paths("foo", "", Ok("foo"));
-        assert_diff_paths("", "foo", Ok(".."));
+        assert_diff_paths!("", "", Ok(""));
+        assert_diff_paths!("foo", "", Ok("foo"));
+        assert_diff_paths!("", "foo", Ok(".."));
     }
 
     #[test]
     fn test_relative() {
-        assert_diff_paths("../foo", "../bar", Ok("../foo"));
-        assert_diff_paths("../foo", "../foo/bar/baz", Ok("../.."));
-        assert_diff_paths("../foo/bar/baz", "../foo", Ok("bar/baz"));
+        assert_diff_paths!("../foo", "../bar", Ok("../foo"));
+        assert_diff_paths!("../foo", "../foo/bar/baz", Ok("../.."));
+        assert_diff_paths!("../foo/bar/baz", "../foo", Ok("bar/baz"));
 
-        assert_diff_paths("foo/bar/baz", "foo", Ok("bar/baz"));
-        assert_diff_paths("foo/bar/baz", "foo/bar", Ok("baz"));
-        assert_diff_paths("foo/bar/baz", "foo/bar/baz", Ok(""));
-        assert_diff_paths("foo/bar/baz", "foo/bar/baz/", Ok(""));
+        assert_diff_paths!("foo/bar/baz", "foo", Ok("bar/baz"));
+        assert_diff_paths!("foo/bar/baz", "foo/bar", Ok("baz"));
+        assert_diff_paths!("foo/bar/baz", "foo/bar/baz", Ok(""));
+        assert_diff_paths!("foo/bar/baz", "foo/bar/baz/", Ok(""));
 
-        assert_diff_paths("foo/bar/baz/", "foo", Ok("bar/baz"));
-        assert_diff_paths("foo/bar/baz/", "foo/bar", Ok("baz"));
-        assert_diff_paths("foo/bar/baz/", "foo/bar/baz", Ok(""));
-        assert_diff_paths("foo/bar/baz/", "foo/bar/baz/", Ok(""));
+        assert_diff_paths!("foo/bar/baz/", "foo", Ok("bar/baz"));
+        assert_diff_paths!("foo/bar/baz/", "foo/bar", Ok("baz"));
+        assert_diff_paths!("foo/bar/baz/", "foo/bar/baz", Ok(""));
+        assert_diff_paths!("foo/bar/baz/", "foo/bar/baz/", Ok(""));
 
-        assert_diff_paths("foo/bar/baz", "foo/", Ok("bar/baz"));
-        assert_diff_paths("foo/bar/baz", "foo/bar/", Ok("baz"));
-        assert_diff_paths("foo/bar/baz", "foo/bar/baz", Ok(""));
+        assert_diff_paths!("foo/bar/baz", "foo/", Ok("bar/baz"));
+        assert_diff_paths!("foo/bar/baz", "foo/bar/", Ok("baz"));
+        assert_diff_paths!("foo/bar/baz", "foo/bar/baz", Ok(""));
     }
 
     #[test]
     fn test_current_directory() {
-        assert_diff_paths(".", "foo", Ok("../."));
-        assert_diff_paths("foo", ".", Ok("foo"));
-        assert_diff_paths("/foo", "/.", Ok("foo"));
-    }
-
-    fn assert_diff_paths(path: &str, base: &str, expected: Result<&str, FromPathError>) {
-        assert_eq!(
-            PathBuf::from(path).relative_to(PathBuf::from(base)),
-            expected.map(|s| s.into())
-        );
+        assert_diff_paths!(".", "foo", Ok("../."));
+        assert_diff_paths!("foo", ".", Ok("foo"));
+        assert_diff_paths!("/foo", "/.", Ok("foo"));
     }
 
     #[test]

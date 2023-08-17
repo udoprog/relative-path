@@ -354,7 +354,7 @@ where
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
 /// use relative_path::{Component, RelativePath};
 ///
 /// let path = RelativePath::new("foo/../bar/./baz");

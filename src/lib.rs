@@ -289,7 +289,7 @@ mod path_ext;
 #[cfg(test)]
 mod tests;
 
-pub use path_ext::PathExt;
+pub use path_ext::{PathExt, RelativeToError};
 
 use std::borrow::{Borrow, Cow};
 use std::cmp;
@@ -576,7 +576,8 @@ pub enum FromPathErrorKind {
     BadSeparator,
 }
 
-/// An error raised when attempting to convert a path using [RelativePathBuf::from_path].
+/// An error raised when attempting to convert a path using
+/// [`RelativePathBuf::from_path`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FromPathError {
     kind: FromPathErrorKind,

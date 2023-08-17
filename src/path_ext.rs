@@ -12,9 +12,46 @@
 // https://github.com/Manishearth/pathdiff/blob/master/src/lib.rs
 // https://github.com/rust-lang/rust/blob/e1d0de82cc40b666b88d4a6d2c9dcbc81d7ed27f/src/librustc_back/rpath.rs#L116-L158
 
+use std::error;
+use std::fmt;
 use std::path::{self, Path, PathBuf};
 
-use crate::{Component, FromPathError, FromPathErrorKind, RelativePathBuf};
+use crate::{Component, RelativePathBuf};
+
+/// An error raised when attempting to convert a path using
+/// [`PathExt::relative_to`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelativeToError {
+    kind: RelativeToErrorKind,
+}
+
+/// Error kind for [`RelativeToError`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+enum RelativeToErrorKind {
+    /// Non-relative component in path.
+    NonRelative,
+    /// Non-utf8 component in path.
+    NonUtf8,
+}
+
+impl fmt::Display for RelativeToError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self.kind {
+            RelativeToErrorKind::NonRelative => "path contains non-relative component".fmt(fmt),
+            RelativeToErrorKind::NonUtf8 => "path contains non-utf8 component".fmt(fmt),
+        }
+    }
+}
+
+impl error::Error for RelativeToError {}
+
+impl From<RelativeToErrorKind> for RelativeToError {
+    #[inline]
+    fn from(kind: RelativeToErrorKind) -> Self {
+        Self { kind }
+    }
+}
 
 /// Extension methods for [`Path`] and [`PathBuf`] to for building and
 /// interacting with [`RelativePath`].
@@ -43,23 +80,23 @@ pub trait PathExt: private::Sealed {
     /// assert_eq!(qux.relative_to(baz)?, RelativePath::new("../qux"));
     /// assert_eq!(baz.relative_to(qux)?, RelativePath::new("../baz"));
     /// assert_eq!(bar.relative_to(qux)?, RelativePath::new("../"));
-    /// # Ok::<_, relative_path::FromPathError>(())
+    /// # Ok::<_, relative_path::RelativeToError>(())
     /// ```
-    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, FromPathError>;
+    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, RelativeToError>;
 }
 
 impl PathExt for Path {
-    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, FromPathError> {
-        use path::Component as C;
+    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, RelativeToError> {
+        use path::Component::*;
 
         // Helper function to convert from a std::path::Component to a
         // relative_path::Component.
-        fn std_to_c(c: C<'_>) -> Result<Component<'_>, FromPathError> {
+        fn std_to_c(c: path::Component<'_>) -> Result<Component<'_>, RelativeToError> {
             Ok(match c {
-                C::CurDir => Component::CurDir,
-                C::ParentDir => Component::ParentDir,
-                C::Normal(n) => Component::Normal(n.to_str().ok_or(FromPathErrorKind::NonUtf8)?),
-                _ => return Err(FromPathErrorKind::NonRelative.into()),
+                CurDir => Component::CurDir,
+                ParentDir => Component::ParentDir,
+                Normal(n) => Component::Normal(n.to_str().ok_or(RelativeToErrorKind::NonUtf8)?),
+                _ => return Err(RelativeToErrorKind::NonRelative.into()),
             })
         }
 
@@ -73,10 +110,10 @@ impl PathExt for Path {
         // paths for different drives on Windows.
         let (a_head, b_head) = loop {
             match (a_it.next(), b_it.next()) {
-                (Some(C::RootDir), Some(C::RootDir)) => (),
-                (Some(C::Prefix(a)), Some(C::Prefix(b))) if a == b => (),
-                (Some(C::Prefix(_) | C::RootDir), _) | (_, Some(C::Prefix(_) | C::RootDir)) => {
-                    return Err(FromPathErrorKind::NonRelative.into());
+                (Some(RootDir), Some(RootDir)) => (),
+                (Some(Prefix(a)), Some(Prefix(b))) if a == b => (),
+                (Some(Prefix(_) | RootDir), _) | (_, Some(Prefix(_) | RootDir)) => {
+                    return Err(RelativeToErrorKind::NonRelative.into());
                 }
                 (None, None) => break (None, None),
                 (a, b) if a != b => break (a, b),
@@ -101,9 +138,9 @@ impl PathExt for Path {
             };
 
             match b_it.next() {
-                Some(C::CurDir) => buf.push(std_to_c(a)?),
-                Some(C::ParentDir) => {
-                    return Err(FromPathErrorKind::NonRelative.into());
+                Some(CurDir) => buf.push(std_to_c(a)?),
+                Some(ParentDir) => {
+                    return Err(RelativeToErrorKind::NonRelative.into());
                 }
                 root => {
                     if root.is_some() {
@@ -112,12 +149,12 @@ impl PathExt for Path {
 
                     for comp in b_it {
                         match comp {
-                            C::ParentDir => {
+                            ParentDir => {
                                 if !buf.pop() {
-                                    return Err(FromPathErrorKind::NonRelative.into());
+                                    return Err(RelativeToErrorKind::NonRelative.into());
                                 }
                             }
-                            C::CurDir => (),
+                            CurDir => (),
                             _ => buf.push(Component::ParentDir),
                         }
                     }
@@ -139,7 +176,7 @@ impl PathExt for Path {
 
 impl PathExt for PathBuf {
     #[inline]
-    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, FromPathError> {
+    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, RelativeToError> {
         self.as_path().relative_to(root)
     }
 }
@@ -156,16 +193,16 @@ impl private::Sealed for PathBuf {}
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use crate::{FromPathError, FromPathErrorKind};
+    use crate::RelativeToError;
 
-    use super::PathExt;
+    use super::{PathExt, RelativeToErrorKind};
     use cfg_if::cfg_if;
 
     macro_rules! assert_diff_paths {
         ($path:expr, $base:expr, $expected:expr $(,)?) => {
             assert_eq!(
                 PathBuf::from($path).relative_to(Path::new($base)),
-                Result::<&str, FromPathError>::map($expected, |s| s.into())
+                Result::<&str, RelativeToError>::map($expected, |s| s.into())
             );
         };
     }
@@ -176,7 +213,7 @@ mod tests {
         assert_diff_paths!(
             "C:/repo",
             "D:/repo",
-            Err(FromPathErrorKind::NonRelative.into()),
+            Err(RelativeToErrorKind::NonRelative.into()),
         );
         assert_diff_paths!("C:/repo", "C:/repo", Ok(""));
     }
@@ -199,12 +236,12 @@ mod tests {
         assert_diff_paths!(
             &abs("foo"),
             "bar",
-            Err(FromPathErrorKind::NonRelative.into()),
+            Err(RelativeToErrorKind::NonRelative.into()),
         );
         assert_diff_paths!(
             "foo",
             &abs("bar"),
-            Err(FromPathErrorKind::NonRelative.into()),
+            Err(RelativeToErrorKind::NonRelative.into()),
         );
     }
 
@@ -277,7 +314,7 @@ mod tests {
         // impossible.
         assert_eq!(
             PathBuf::from(".").relative_to(PathBuf::from("a/../..")),
-            Err(FromPathErrorKind::NonRelative.into()),
+            Err(RelativeToErrorKind::NonRelative.into()),
         );
     }
 }

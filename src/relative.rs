@@ -26,21 +26,18 @@ pub trait PathExt: private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use std::path::PathBuf;
-    /// use relative_path::PathExt;
+    /// use std::path::Path;
+    /// use relative_path::{RelativePath, PathExt};
     ///
-    /// let baz = PathBuf::from("/foo/bar/baz");
-    /// let bar = PathBuf::from("/foo/bar");
-    /// let quux = PathBuf::from("/foo/bar/quux");
+    /// let baz = Path::new("/foo/bar/baz");
+    /// let bar = Path::new("/foo/bar");
+    /// let qux = Path::new("/foo/bar/qux");
     ///
-    /// assert_eq!(bar.relative_to(&baz)?, "../");
-    /// assert_eq!(baz.relative_to(&bar)?, "baz");
-    /// assert_eq!(quux.relative_to(&baz)?, "../quux");
-    /// assert_eq!(baz.relative_to(&quux)?, "../baz");
-    /// assert_eq!(bar.relative_to(&quux)?, "../");
-    ///
-    /// assert_eq!(baz.as_path().relative_to(&bar)?, "baz");
-    /// assert_eq!(baz.as_path().relative_to(bar.as_path())?, "baz");
+    /// assert_eq!(bar.relative_to(baz)?, RelativePath::new("../"));
+    /// assert_eq!(baz.relative_to(bar)?, RelativePath::new("baz"));
+    /// assert_eq!(qux.relative_to(baz)?, RelativePath::new("../qux"));
+    /// assert_eq!(baz.relative_to(qux)?, RelativePath::new("../baz"));
+    /// assert_eq!(bar.relative_to(qux)?, RelativePath::new("../"));
     /// # Ok::<_, relative_path::FromPathError>(())
     /// ```
     fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, FromPathError>;

@@ -259,11 +259,13 @@
 //!         Path::new("foo/bar/baz"),
 //!         RelativePath::new("/bar/baz").to_path("foo")
 //!     );
-//!     assert_eq!(
-//!         Path::new("foo").relative_to("bar").unwrap(),
-//!         RelativePath::new("../foo"),
-//!     );
 //! }
+//!
+//! assert_eq!(
+//!     Path::new("foo").relative_to("bar")?,
+//!     RelativePath::new("../foo"),
+//! );
+//! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html

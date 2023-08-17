@@ -27,7 +27,7 @@ across platforms.
 Add `relative-path` to your `Cargo.toml`:
 
 ```toml
-relative-path = "1.8.1"
+relative-path = "1.9.0"
 ```
 
 Start using relative paths:
@@ -230,13 +230,16 @@ not be used as legal paths on all platforms.
 * Windows has a number of [reserved characters and names][windows-reserved]
   (like `CON`, `PRN`, and `AUX`) which cannot legally be part of a
   filesystem component.
+* Windows paths are [case-insensitive by default][windows-case]. So,
+  `Foo.txt` and `foo.txt` are the same files on windows. But they are
+  considered different paths on most unix systems.
 
 A relative path that *accidentally* contains a platform-specific components
 will largely result in a nonsensical paths being generated in the hope that
 they will fail fast during development and testing.
 
 ```rust
-use relative_path::RelativePath;
+use relative_path::{RelativePath, PathExt};
 use std::path::Path;
 
 if cfg!(windows) {
@@ -252,6 +255,11 @@ if cfg!(unix) {
         RelativePath::new("/bar/baz").to_path("foo")
     );
 }
+
+assert_eq!(
+    Path::new("foo").relative_to("bar")?,
+    RelativePath::new("../foo"),
+);
 ```
 
 [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html
@@ -264,3 +272,4 @@ if cfg!(unix) {
 [`to_logical_path`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_logical_path
 [`to_path`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path
 [windows-reserved]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
+[windows-case]: https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity

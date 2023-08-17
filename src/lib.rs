@@ -284,12 +284,12 @@
 
 #![deny(missing_docs)]
 
-mod relative;
+mod path_ext;
 
 #[cfg(test)]
 mod tests;
 
-pub use relative::PathExt;
+pub use path_ext::PathExt;
 
 use std::borrow::{Borrow, Cow};
 use std::cmp;

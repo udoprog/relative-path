@@ -8,15 +8,27 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-// Ported from the pathdiff crate, which adapted the original rustc's path_relative_from
+// Ported from the pathdiff crate, which adapted the original rustc's
+// path_relative_from
 // https://github.com/Manishearth/pathdiff/blob/master/src/lib.rs
 // https://github.com/rust-lang/rust/blob/e1d0de82cc40b666b88d4a6d2c9dcbc81d7ed27f/src/librustc_back/rpath.rs#L116-L158
 
 use std::error;
 use std::fmt;
-use std::path::{self, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use crate::{Component, RelativePathBuf};
+
+// Prevent downstream implementations, so methods may be added without backwards
+// breaking changes.
+mod sealed {
+    use std::path::{Path, PathBuf};
+
+    pub trait Sealed {}
+
+    impl Sealed for Path {}
+    impl Sealed for PathBuf {}
+}
 
 /// An error raised when attempting to convert a path using
 /// [`PathExt::relative_to`].
@@ -76,7 +88,7 @@ impl From<RelativeToErrorKind> for RelativeToError {
 /// interacting with [`RelativePath`].
 ///
 /// [`RelativePath`]: crate::RelativePath
-pub trait PathExt: private::Sealed {
+pub trait PathExt: sealed::Sealed {
     /// Build a relative path from the provided directory to `self`.
     ///
     /// Producing a relative path like this is a logical operation and does not
@@ -106,11 +118,11 @@ pub trait PathExt: private::Sealed {
 
 impl PathExt for Path {
     fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, RelativeToError> {
-        use path::Component::*;
+        use std::path::Component::*;
 
         // Helper function to convert from a std::path::Component to a
         // relative_path::Component.
-        fn std_to_c(c: path::Component<'_>) -> Result<Component<'_>, RelativeToError> {
+        fn std_to_c(c: std::path::Component<'_>) -> Result<Component<'_>, RelativeToError> {
             Ok(match c {
                 CurDir => Component::CurDir,
                 ParentDir => Component::ParentDir,
@@ -200,154 +212,130 @@ impl PathExt for PathBuf {
     }
 }
 
-// Prevent downstream implementations, so methods may be added without backwards breaking changes.
-mod private {
-    use std::path::{Path, PathBuf};
-
-    pub trait Sealed {}
-
-    impl Sealed for Path {}
-    impl Sealed for PathBuf {}
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
-    use crate::RelativeToError;
-
     use super::{PathExt, RelativeToErrorKind};
-    use cfg_if::cfg_if;
+    use crate::{RelativePathBuf, RelativeToError};
 
-    macro_rules! assert_diff_paths {
-        ($path:expr, $base:expr, $expected:expr $(,)?) => {
+    macro_rules! assert_relative_to {
+        ($path:expr, $base:expr, Ok($expected:expr) $(,)?) => {
             assert_eq!(
                 Path::new($path).relative_to($base),
-                Result::<&str, RelativeToError>::map($expected, |s| s.into())
+                Ok(RelativePathBuf::from($expected))
             );
+        };
+
+        ($path:expr, $base:expr, Err($expected:ident) $(,)?) => {
+            assert_eq!(
+                Path::new($path).relative_to($base),
+                Err(RelativeToError::from(RelativeToErrorKind::$expected))
+            );
+        };
+    }
+
+    #[cfg(windows)]
+    macro_rules! abs {
+        ($path:expr) => {
+            Path::new(concat!("C:\\", $path))
+        };
+    }
+
+    #[cfg(not(windows))]
+    macro_rules! abs {
+        ($path:expr) => {
+            Path::new(concat!("/", $path))
         };
     }
 
     #[test]
     #[cfg(windows)]
     fn test_different_prefixes() {
-        assert_diff_paths!(
-            "C:\\repo",
-            "D:\\repo",
-            Err(RelativeToErrorKind::PrefixMismatch.into()),
-        );
-        assert_diff_paths!("C:\\repo", "C:\\repo", Ok(""));
-        assert_diff_paths!(
+        assert_relative_to!("C:\\repo", "D:\\repo", Err(PrefixMismatch),);
+        assert_relative_to!("C:\\repo", "C:\\repo", Ok(""));
+        assert_relative_to!(
             "\\\\server\\share\\repo",
             "\\\\server2\\share\\repo",
-            Err(RelativeToErrorKind::PrefixMismatch.into()),
+            Err(PrefixMismatch),
         );
     }
 
     #[test]
     fn test_absolute() {
-        fn abs(path: &str) -> String {
-            // Absolute paths look different on Windows vs Unix.
-            cfg_if! {
-                if #[cfg(windows)] {
-                    format!("C:\\{}", path)
-                } else {
-                    format!("/{}", path)
-                }
-            }
-        }
-
-        assert_diff_paths!(&abs("foo"), &abs("bar"), Ok("../foo"));
-        assert_diff_paths!("foo", "bar", Ok("../foo"));
-        assert_diff_paths!(
-            &abs("foo"),
-            "bar",
-            Err(RelativeToErrorKind::PrefixMismatch.into()),
-        );
-        assert_diff_paths!(
-            "foo",
-            &abs("bar"),
-            Err(RelativeToErrorKind::PrefixMismatch.into()),
-        );
+        assert_relative_to!(abs!("foo"), abs!("bar"), Ok("../foo"));
+        assert_relative_to!("foo", "bar", Ok("../foo"));
+        assert_relative_to!(abs!("foo"), "bar", Err(PrefixMismatch));
+        assert_relative_to!("foo", abs!("bar"), Err(PrefixMismatch));
     }
 
     #[test]
     fn test_identity() {
-        assert_diff_paths!(".", ".", Ok(""));
-        assert_diff_paths!("../foo", "../foo", Ok(""));
-        assert_diff_paths!("./foo", "./foo", Ok(""));
-        assert_diff_paths!("/foo", "/foo", Ok(""));
-        assert_diff_paths!("foo", "foo", Ok(""));
+        assert_relative_to!(".", ".", Ok(""));
+        assert_relative_to!("../foo", "../foo", Ok(""));
+        assert_relative_to!("./foo", "./foo", Ok(""));
+        assert_relative_to!("/foo", "/foo", Ok(""));
+        assert_relative_to!("foo", "foo", Ok(""));
 
-        assert_diff_paths!("../foo/bar/baz", "../foo/bar/baz", Ok(""));
-        assert_diff_paths!("foo/bar/baz", "foo/bar/baz", Ok(""));
+        assert_relative_to!("../foo/bar/baz", "../foo/bar/baz", Ok(""));
+        assert_relative_to!("foo/bar/baz", "foo/bar/baz", Ok(""));
     }
 
     #[test]
     fn test_subset() {
-        assert_diff_paths!("foo", "fo", Ok("../foo"));
-        assert_diff_paths!("fo", "foo", Ok("../fo"));
+        assert_relative_to!("foo", "fo", Ok("../foo"));
+        assert_relative_to!("fo", "foo", Ok("../fo"));
     }
 
     #[test]
     fn test_empty() {
-        assert_diff_paths!("", "", Ok(""));
-        assert_diff_paths!("foo", "", Ok("foo"));
-        assert_diff_paths!("", "foo", Ok(".."));
+        assert_relative_to!("", "", Ok(""));
+        assert_relative_to!("foo", "", Ok("foo"));
+        assert_relative_to!("", "foo", Ok(".."));
     }
 
     #[test]
     fn test_relative() {
-        assert_diff_paths!("../foo", "../bar", Ok("../foo"));
-        assert_diff_paths!("../foo", "../foo/bar/baz", Ok("../.."));
-        assert_diff_paths!("../foo/bar/baz", "../foo", Ok("bar/baz"));
+        assert_relative_to!("../foo", "../bar", Ok("../foo"));
+        assert_relative_to!("../foo", "../foo/bar/baz", Ok("../.."));
+        assert_relative_to!("../foo/bar/baz", "../foo", Ok("bar/baz"));
 
-        assert_diff_paths!("foo/bar/baz", "foo", Ok("bar/baz"));
-        assert_diff_paths!("foo/bar/baz", "foo/bar", Ok("baz"));
-        assert_diff_paths!("foo/bar/baz", "foo/bar/baz", Ok(""));
-        assert_diff_paths!("foo/bar/baz", "foo/bar/baz/", Ok(""));
+        assert_relative_to!("foo/bar/baz", "foo", Ok("bar/baz"));
+        assert_relative_to!("foo/bar/baz", "foo/bar", Ok("baz"));
+        assert_relative_to!("foo/bar/baz", "foo/bar/baz", Ok(""));
+        assert_relative_to!("foo/bar/baz", "foo/bar/baz/", Ok(""));
 
-        assert_diff_paths!("foo/bar/baz/", "foo", Ok("bar/baz"));
-        assert_diff_paths!("foo/bar/baz/", "foo/bar", Ok("baz"));
-        assert_diff_paths!("foo/bar/baz/", "foo/bar/baz", Ok(""));
-        assert_diff_paths!("foo/bar/baz/", "foo/bar/baz/", Ok(""));
+        assert_relative_to!("foo/bar/baz/", "foo", Ok("bar/baz"));
+        assert_relative_to!("foo/bar/baz/", "foo/bar", Ok("baz"));
+        assert_relative_to!("foo/bar/baz/", "foo/bar/baz", Ok(""));
+        assert_relative_to!("foo/bar/baz/", "foo/bar/baz/", Ok(""));
 
-        assert_diff_paths!("foo/bar/baz", "foo/", Ok("bar/baz"));
-        assert_diff_paths!("foo/bar/baz", "foo/bar/", Ok("baz"));
-        assert_diff_paths!("foo/bar/baz", "foo/bar/baz", Ok(""));
+        assert_relative_to!("foo/bar/baz", "foo/", Ok("bar/baz"));
+        assert_relative_to!("foo/bar/baz", "foo/bar/", Ok("baz"));
+        assert_relative_to!("foo/bar/baz", "foo/bar/baz", Ok(""));
     }
 
     #[test]
     fn test_current_directory() {
-        assert_diff_paths!(".", "foo", Ok("../."));
-        assert_diff_paths!("foo", ".", Ok("foo"));
-        assert_diff_paths!("/foo", "/.", Ok("foo"));
+        assert_relative_to!(".", "foo", Ok("../."));
+        assert_relative_to!("foo", ".", Ok("foo"));
+        assert_relative_to!("/foo", "/.", Ok("foo"));
     }
 
     #[test]
     fn assert_does_not_skip_parents() {
-        assert_eq!(
-            Path::new("some/path").relative_to("some/foo/baz/path"),
-            Ok("../../../path".into())
-        );
-
-        assert_eq!(
-            Path::new("some/path").relative_to("some/foo/bar/../baz/path"),
-            Ok("../../../path".into())
-        );
+        assert_relative_to!("some/path", "some/foo/baz/path", Ok("../../../path"));
+        assert_relative_to!("some/path", "some/foo/bar/../baz/path", Ok("../../../path"));
     }
 
     #[test]
     fn test_ambiguous_paths() {
         // Parent directory name is unknown, so trying to make current directory
         // relative to it is impossible.
-        assert_eq!(
-            Path::new(".").relative_to("../.."),
-            Err(RelativeToErrorKind::AmbiguousTraversal.into()),
-        );
-        assert_eq!(
-            Path::new(".").relative_to("a/../.."),
-            Err(RelativeToErrorKind::AmbiguousTraversal.into()),
-        );
+        assert_relative_to!(".", "../..", Err(AmbiguousTraversal));
+        assert_relative_to!(".", "a/../..", Err(AmbiguousTraversal));
+        // Common prefixes are ok.
+        assert_relative_to!("../a/..", "../a/../b", Ok(".."));
+        assert_relative_to!("../a/../b", "../a/..", Ok("b"));
     }
 }

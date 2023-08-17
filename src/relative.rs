@@ -56,9 +56,7 @@ impl PathExt for Path {
             Ok(match c {
                 C::CurDir => Component::CurDir,
                 C::ParentDir => Component::ParentDir,
-                C::Normal(n) => {
-                    Component::Normal(n.to_str().ok_or_else(|| FromPathErrorKind::NonUtf8)?)
-                }
+                C::Normal(n) => Component::Normal(n.to_str().ok_or(FromPathErrorKind::NonUtf8)?),
                 _ => return Err(FromPathErrorKind::NonRelative.into()),
             })
         }

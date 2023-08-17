@@ -477,7 +477,7 @@ impl<'a> Iterator for Components<'a> {
                 self.source = rest.trim_start_matches(SEP);
                 slice
             }
-            None => mem::replace(&mut self.source, ""),
+            None => mem::take(&mut self.source),
         };
 
         match slice {
@@ -499,7 +499,7 @@ impl<'a> DoubleEndedIterator for Components<'a> {
                 self.source = rest.trim_end_matches(SEP);
                 slice
             }
-            None => mem::replace(&mut self.source, ""),
+            None => mem::take(&mut self.source),
         };
 
         match slice {

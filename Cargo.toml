@@ -9,7 +9,7 @@ documentation = "https://docs.rs/relative-path"
 readme = "README.md"
 homepage = "https://github.com/udoprog/relative-path"
 repository = "https://github.com/udoprog/relative-path"
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 keywords = ["path"]
 categories = ["filesystem"]
 

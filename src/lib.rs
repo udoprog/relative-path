@@ -290,9 +290,13 @@ mod path_ext;
 
 #[cfg(feature = "root")]
 #[doc(inline)]
-pub use self::root::{OpenOptions, Root};
+pub use self::root::{DirEntry, OpenOptions, ReadDir, Root};
 #[cfg(feature = "root")]
 mod root;
+
+pub use self::glob::Glob;
+#[cfg(feature = "root")]
+mod glob;
 
 #[cfg(test)]
 mod tests;

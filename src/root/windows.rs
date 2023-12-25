@@ -1,21 +1,23 @@
-use std::ffi::c_void;
-use std::fs::File;
-use std::io;
+use std::ffi::OsString;
+use std::fs::{File, Metadata};
 use std::mem;
 use std::mem::size_of;
 use std::mem::MaybeUninit;
+use std::os::windows::ffi::OsStringExt;
 use std::os::windows::fs::OpenOptionsExt;
-use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
+use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle};
 use std::path::Path;
 use std::path::MAIN_SEPARATOR;
 use std::ptr;
+use std::{io, slice};
 
 use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
-use windows_sys::Wdk::Storage::FileSystem::FILE_SYNCHRONOUS_IO_ALERT;
-use windows_sys::Wdk::Storage::FileSystem::{self as nt, NtCreateFile};
+use windows_sys::Wdk::Storage::FileSystem as nt;
+use windows_sys::Wdk::System::SystemServices::SL_RESTART_SCAN;
 use windows_sys::Win32::Foundation::STATUS_SUCCESS;
 use windows_sys::Win32::Foundation::{
-    RtlNtStatusToDosError, ERROR_INVALID_PARAMETER, HANDLE, STATUS_PENDING, UNICODE_STRING,
+    RtlNtStatusToDosError, ERROR_INVALID_PARAMETER, HANDLE, STATUS_NO_MORE_FILES, STATUS_PENDING,
+    UNICODE_STRING,
 };
 use windows_sys::Win32::Storage::FileSystem as c;
 use windows_sys::Win32::System::IO::IO_STATUS_BLOCK;
@@ -29,10 +31,7 @@ pub(super) struct Root {
 }
 
 impl Root {
-    pub(super) fn new<P>(path: P) -> io::Result<Self>
-    where
-        P: AsRef<Path>,
-    {
+    pub(super) fn new(path: &Path) -> io::Result<Self> {
         let file = std::fs::OpenOptions::new()
             .read(true)
             .attributes(c::FILE_FLAG_BACKUP_SEMANTICS)
@@ -43,11 +42,17 @@ impl Root {
         })
     }
 
-    pub(super) fn open_at<P>(&self, path: P, options: &OpenOptions) -> io::Result<File>
-    where
-        P: AsRef<RelativePath>,
-    {
-        let path = encode_path_wide(&path)?;
+    pub(super) fn open_at(&self, path: &RelativePath, options: &OpenOptions) -> io::Result<File> {
+        let handle = self.open_inner(path, options)?;
+        Ok(File::from(handle))
+    }
+
+    pub(super) fn open_inner(
+        &self,
+        path: &RelativePath,
+        options: &OpenOptions,
+    ) -> io::Result<OwnedHandle> {
+        let path = encode_path_wide(path)?;
 
         // SAFETY: All the operations and parameters are correctly used.
         unsafe {
@@ -77,7 +82,7 @@ impl Root {
 
             let mut handle = MaybeUninit::zeroed();
 
-            let status = NtCreateFile(
+            let status = nt::NtCreateFile(
                 handle.as_mut_ptr(),
                 options.get_access_mode()?,
                 &attributes,
@@ -86,7 +91,7 @@ impl Root {
                 0,
                 options.share_mode,
                 options.get_creation_mode()?,
-                FILE_SYNCHRONOUS_IO_ALERT,
+                nt::FILE_SYNCHRONOUS_IO_ALERT | options.custom_create_options,
                 ptr::null(),
                 0,
             );
@@ -97,17 +102,146 @@ impl Root {
                 ));
             }
 
-            let handle = handle.assume_init();
-            Ok(File::from_raw_handle(handle as *mut c_void))
+            Ok(OwnedHandle::from_raw_handle(
+                handle.assume_init() as RawHandle
+            ))
+        }
+    }
+
+    pub(super) fn metadata(&self, path: &RelativePath) -> io::Result<Metadata> {
+        let mut opts = OpenOptions::new();
+        opts.read(true);
+        opts.access_mode = Some(c::FILE_READ_ATTRIBUTES);
+        // No read or write permissions are necessary
+        // opts.access_mode = Some(0);
+        // opts.custom_create_options = nt::FILE_OPEN_FOR_BACKUP_INTENT;
+        let file = self.open_at(path, &opts)?;
+        file.metadata()
+    }
+
+    pub(super) fn read_dir(&self, path: &RelativePath) -> io::Result<ReadDir> {
+        let mut opts = OpenOptions::new();
+        opts.access_mode = Some(c::SYNCHRONIZE | c::FILE_LIST_DIRECTORY);
+        let handle = self.open_inner(path, &opts)?;
+
+        Ok(ReadDir {
+            handle,
+            buffer: [0; 1024],
+            at: None,
+            first: true,
+        })
+    }
+}
+
+pub(super) struct ReadDir {
+    handle: OwnedHandle,
+    buffer: [u8; 1024],
+    first: bool,
+    at: Option<usize>,
+}
+
+impl Iterator for ReadDir {
+    type Item = io::Result<DirEntry>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            while let Some(at) = self.at.take() {
+                unsafe {
+                    let file_names = &*self.buffer[at..]
+                        .as_ptr()
+                        .cast::<nt::FILE_NAMES_INFORMATION>();
+
+                    let len = file_names.FileNameLength;
+                    let ptr = file_names.FileName.as_ptr();
+                    let name = slice::from_raw_parts(ptr, len as usize / 2);
+
+                    if file_names.NextEntryOffset != 0 {
+                        self.at = Some(at + file_names.NextEntryOffset as usize);
+                    }
+
+                    if let Some(entry) = DirEntry::new(name) {
+                        return Some(Ok(entry));
+                    }
+                }
+            }
+
+            unsafe {
+                let mut status_block = IO_STATUS_BLOCK {
+                    Anonymous: windows_sys::Win32::System::IO::IO_STATUS_BLOCK_0 {
+                        Status: STATUS_PENDING,
+                    },
+                    Information: 0,
+                };
+
+                let status = nt::NtQueryDirectoryFileEx(
+                    self.handle.as_raw_handle() as HANDLE,
+                    0,
+                    None,
+                    ptr::null(),
+                    &mut status_block,
+                    self.buffer.as_mut_ptr().cast(),
+                    self.buffer.len() as u32,
+                    12, // FileNamesInformation
+                    if mem::take(&mut self.first) {
+                        SL_RESTART_SCAN
+                    } else {
+                        0
+                    },
+                    ptr::null(),
+                );
+
+                if status == STATUS_NO_MORE_FILES {
+                    return None;
+                }
+
+                if status != STATUS_SUCCESS {
+                    return Some(Err(io::Error::from_raw_os_error(
+                        RtlNtStatusToDosError(status) as i32,
+                    )));
+                }
+
+                self.at = Some(0);
+            }
         }
     }
 }
 
-fn encode_path_wide<P>(path: &P) -> io::Result<Vec<u16>>
-where
-    P: AsRef<RelativePath>,
-{
-    let path = path.as_ref();
+struct FindNextFileHandle(HANDLE);
+
+unsafe impl Send for FindNextFileHandle {}
+unsafe impl Sync for FindNextFileHandle {}
+
+pub(super) struct DirEntry {
+    file_name: OsString,
+}
+
+impl DirEntry {
+    fn new(data: &[u16]) -> Option<Self> {
+        match data {
+            // check for '.' and '..'
+            [46] | [46, 46] => return None,
+            _ => {}
+        }
+
+        Some(DirEntry {
+            file_name: OsString::from_wide(data),
+        })
+    }
+
+    pub(super) fn file_name(&self) -> OsString {
+        self.file_name.to_owned()
+    }
+}
+
+impl Drop for FindNextFileHandle {
+    fn drop(&mut self) {
+        let r = unsafe { c::FindClose(self.0) };
+        debug_assert!(r != 0);
+    }
+}
+
+fn encode_path_wide(path: &RelativePath) -> io::Result<Vec<u16>> {
     let mut output = Vec::with_capacity(path.as_str().len() * 2);
 
     let mut separator = [0; 2];
@@ -131,7 +265,7 @@ where
                     .rposition(|window| window == separator)
                     .unwrap_or(0);
 
-                output.truncate(index);
+                output.truncate(index * 2);
             }
             Component::Normal(normal) => {
                 output.extend(normal.encode_utf16());
@@ -155,7 +289,9 @@ pub(super) struct OpenOptions {
     create: bool,
     create_new: bool,
     // system-specific
+    custom_create_options: u32,
     share_mode: u32,
+    access_mode: Option<u32>,
 }
 
 impl OpenOptions {
@@ -169,7 +305,9 @@ impl OpenOptions {
             create: false,
             create_new: false,
             // system-specific
+            custom_create_options: 0,
             share_mode: c::FILE_SHARE_READ | c::FILE_SHARE_WRITE | c::FILE_SHARE_DELETE,
+            access_mode: None,
         }
     }
 
@@ -199,28 +337,27 @@ impl OpenOptions {
 
     fn get_access_mode(&self) -> io::Result<u32> {
         // NtCreateFile does not support `GENERIC_READ`.
-        const DEFAULT_READ: u32 = c::STANDARD_RIGHTS_READ
-            | c::SYNCHRONIZE
-            | c::FILE_READ_DATA
-            | c::FILE_READ_EA
-            | c::FILE_READ_ATTRIBUTES;
+        const DEFAULT_READ: u32 =
+            c::STANDARD_RIGHTS_READ | c::FILE_READ_DATA | c::FILE_READ_EA | c::FILE_READ_ATTRIBUTES;
 
         const DEFAULT_WRITE: u32 = c::STANDARD_RIGHTS_WRITE
-            | c::SYNCHRONIZE
             | c::FILE_WRITE_DATA
             | c::FILE_WRITE_EA
             | c::FILE_WRITE_ATTRIBUTES;
 
-        match (self.read, self.write, self.append) {
-            (true, false, false) => Ok(DEFAULT_READ),
-            (false, true, false) => Ok(DEFAULT_WRITE),
-            (true, true, false) => Ok(DEFAULT_READ | DEFAULT_WRITE),
-            (false, _, true) => Ok(c::FILE_GENERIC_WRITE & !c::FILE_WRITE_DATA),
-            (true, _, true) => Ok(DEFAULT_READ | (c::FILE_GENERIC_WRITE & !c::FILE_WRITE_DATA)),
-            (false, false, false) => {
-                Err(io::Error::from_raw_os_error(ERROR_INVALID_PARAMETER as i32))
+        let access_mode = match (self.read, self.write, self.append, self.access_mode) {
+            (_, _, _, Some(access_mode)) => access_mode,
+            (true, false, false, _) => DEFAULT_READ,
+            (false, true, false, _) => DEFAULT_WRITE,
+            (true, true, false, _) => DEFAULT_READ | DEFAULT_WRITE,
+            (false, _, true, _) => c::FILE_GENERIC_WRITE & !c::FILE_WRITE_DATA,
+            (true, _, true, _) => DEFAULT_READ | (c::FILE_GENERIC_WRITE & !c::FILE_WRITE_DATA),
+            (false, false, false, _) => {
+                return Err(io::Error::from_raw_os_error(ERROR_INVALID_PARAMETER as i32));
             }
-        }
+        };
+
+        Ok(access_mode | c::SYNCHRONIZE)
     }
 
     fn get_creation_mode(&self) -> io::Result<u32> {

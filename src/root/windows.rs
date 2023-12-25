@@ -24,8 +24,6 @@ use windows_sys::Win32::System::IO::IO_STATUS_BLOCK;
 use crate::Component;
 use crate::RelativePath;
 
-type DWORD = u32;
-
 #[derive(Debug)]
 pub(super) struct Root {
     handle: OwnedHandle,
@@ -158,7 +156,7 @@ pub(super) struct OpenOptions {
     create: bool,
     create_new: bool,
     // system-specific
-    share_mode: DWORD,
+    share_mode: u32,
 }
 
 impl OpenOptions {
@@ -200,15 +198,15 @@ impl OpenOptions {
         self.create_new = create_new;
     }
 
-    fn get_access_mode(&self) -> io::Result<DWORD> {
+    fn get_access_mode(&self) -> io::Result<u32> {
         // NtCreateFile does not support `GENERIC_READ`.
-        const DEFAULT_READ: DWORD = c::STANDARD_RIGHTS_READ
+        const DEFAULT_READ: u32 = c::STANDARD_RIGHTS_READ
             | c::SYNCHRONIZE
             | c::FILE_READ_DATA
             | c::FILE_READ_EA
             | c::FILE_READ_ATTRIBUTES;
 
-        const DEFAULT_WRITE: DWORD = c::STANDARD_RIGHTS_WRITE
+        const DEFAULT_WRITE: u32 = c::STANDARD_RIGHTS_WRITE
             | c::SYNCHRONIZE
             | c::FILE_WRITE_DATA
             | c::FILE_WRITE_EA
@@ -226,7 +224,7 @@ impl OpenOptions {
         }
     }
 
-    fn get_creation_mode(&self) -> io::Result<DWORD> {
+    fn get_creation_mode(&self) -> io::Result<u32> {
         match (self.write, self.append) {
             (true, false) => {}
             (false, false) => {

@@ -23,7 +23,7 @@ fn files(list: &[(&'static str, Option<&'static str>)]) {
 
         if let Some(content) = content {
             if let Some(parent) = path.parent() {
-                if let Err(error) = fs::create_dir_all(&parent) {
+                if let Err(error) = fs::create_dir_all(parent) {
                     panic!("Failed to create directory {}: {}", parent.display(), error);
                 }
             }
@@ -31,10 +31,8 @@ fn files(list: &[(&'static str, Option<&'static str>)]) {
             if let Err(error) = fs::write(&path, content) {
                 panic!("Failed to create file {}: {}", path.display(), error);
             }
-        } else {
-            if let Err(error) = fs::create_dir_all(&path) {
-                panic!("Failed to create directory {}: {}", path.display(), error);
-            }
+        } else if let Err(error) = fs::create_dir_all(&path) {
+            panic!("Failed to create directory {}: {}", path.display(), error);
         }
     }
 }

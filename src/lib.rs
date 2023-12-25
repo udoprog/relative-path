@@ -945,12 +945,14 @@ impl cmp::PartialEq for RelativePathBuf {
 impl cmp::Eq for RelativePathBuf {}
 
 impl cmp::PartialOrd for RelativePathBuf {
+    #[inline]
     fn partial_cmp(&self, other: &RelativePathBuf) -> Option<cmp::Ordering> {
-        self.components().partial_cmp(other.components())
+        Some(self.cmp(other))
     }
 }
 
 impl cmp::Ord for RelativePathBuf {
+    #[inline]
     fn cmp(&self, other: &RelativePathBuf) -> cmp::Ordering {
         self.components().cmp(other.components())
     }
@@ -1997,7 +1999,7 @@ impl cmp::Eq for RelativePath {}
 impl cmp::PartialOrd for RelativePath {
     #[inline]
     fn partial_cmp(&self, other: &RelativePath) -> Option<cmp::Ordering> {
-        self.components().partial_cmp(other.components())
+        Some(self.cmp(other))
     }
 }
 

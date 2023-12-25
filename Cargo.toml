@@ -14,10 +14,25 @@ keywords = ["path"]
 categories = ["filesystem"]
 
 [features]
-default = []
+default = ["root"]
+root = ["dep:windows-sys"]
 
 [dependencies]
 serde = { version = "1.0.160", optional = true }
 
+[target.'cfg(windows)'.dependencies.windows-sys]
+version = "0.52.0"
+optional = true
+features = [
+    "Wdk_Foundation",
+    "Wdk_Storage_FileSystem",
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_Security",
+    "Win32_System_Kernel",
+]
+
 [dev-dependencies]
+anyhow = "1.0.76"
 serde = { version = "1.0.160", features = ["derive"] }

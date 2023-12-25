@@ -288,6 +288,12 @@
 
 mod path_ext;
 
+#[cfg(feature = "root")]
+#[doc(inline)]
+pub use self::root::Root;
+#[cfg(feature = "root")]
+mod root;
+
 #[cfg(test)]
 mod tests;
 

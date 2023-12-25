@@ -290,7 +290,7 @@ mod path_ext;
 
 #[cfg(feature = "root")]
 #[doc(inline)]
-pub use self::root::Root;
+pub use self::root::{OpenOptions, Root};
 #[cfg(feature = "root")]
 mod root;
 
@@ -386,7 +386,9 @@ pub enum Component<'a> {
 }
 
 impl<'a> Component<'a> {
-    /// Extracts the underlying [`str`][std::str] slice.
+    /// Extracts the underlying [`str`] slice.
+    ///
+    /// [`str`]: prim@str
     ///
     /// # Examples
     ///
@@ -549,10 +551,12 @@ impl<'a> cmp::PartialEq for Components<'a> {
     }
 }
 
-/// An iterator over the [`Component`]s of a [`RelativePath`], as
-/// [`str`][std::str] slices.
+/// An iterator over the [`Component`]s of a [`RelativePath`], as [`str`]
+/// slices.
 ///
 /// This `struct` is created by the [`iter`][RelativePath::iter] method.
+///
+/// [`str`]: prim@str
 #[derive(Clone)]
 pub struct Iter<'a> {
     inner: Components<'a>,
@@ -1051,7 +1055,9 @@ impl RelativePath {
         Ok(rel)
     }
 
-    /// Yields the underlying [`str`][std::str] slice.
+    /// Yields the underlying [`str`] slice.
+    ///
+    /// [`str`]: prim@str
     ///
     /// # Examples
     ///
@@ -1115,11 +1121,13 @@ impl RelativePath {
         Components::new(&self.inner)
     }
 
-    /// Produces an iterator over the path's components viewed as
-    /// [`str`][std::str] slices.
+    /// Produces an iterator over the path's components viewed as [`str`]
+    /// slices.
     ///
     /// For more information about the particulars of how the path is separated
     /// into components, see [`components`][Self::components].
+    ///
+    /// [`str`]: prim@str
     ///
     /// # Examples
     ///

@@ -33,6 +33,9 @@ features = [
     "Win32_System_Kernel",
 ]
 
+[target.'cfg(unix)'.dependencies.libc]
+version = "0.2.151"
+
 [dev-dependencies]
 anyhow = "1.0.76"
 serde = { version = "1.0.160", features = ["derive"] }

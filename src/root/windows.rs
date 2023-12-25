@@ -1,14 +1,14 @@
 use std::ffi::c_void;
-use std::ffi::OsStr;
 use std::fs::File;
 use std::io;
 use std::mem;
 use std::mem::size_of;
 use std::mem::MaybeUninit;
-use std::os::windows::ffi::OsStrExt;
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
 use std::path::Path;
+use std::path::MAIN_SEPARATOR;
+use std::path::MAIN_SEPARATOR_STR;
 use std::ptr;
 
 use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
@@ -21,6 +21,7 @@ use windows_sys::Win32::Foundation::{
 use windows_sys::Win32::Storage::FileSystem as c;
 use windows_sys::Win32::System::IO::IO_STATUS_BLOCK;
 
+use crate::Component;
 use crate::RelativePath;
 
 type DWORD = u32;
@@ -31,7 +32,7 @@ pub(super) struct Root {
 }
 
 impl Root {
-    pub(super) fn open<P>(path: P) -> io::Result<Self>
+    pub(super) fn new<P>(path: P) -> io::Result<Self>
     where
         P: AsRef<Path>,
     {
@@ -39,25 +40,26 @@ impl Root {
             .read(true)
             .attributes(c::FILE_FLAG_BACKUP_SEMANTICS)
             .open(path)?;
-        let handle = OwnedHandle::from(file);
-        Ok(Root { handle })
+
+        Ok(Root {
+            handle: OwnedHandle::from(file),
+        })
     }
 
     pub(super) fn open_at<P>(&self, path: P, options: &OpenOptions) -> io::Result<File>
     where
         P: AsRef<RelativePath>,
     {
-        let object_name = OsStr::new(path.as_ref().as_str())
-            .encode_wide()
-            .collect::<Vec<u16>>();
+        let path = encode_path_wide(&path)?;
 
+        // SAFETY: All the operations and parameters are correctly used.
         unsafe {
-            let len = mem::size_of_val(&object_name[..]);
+            let len = mem::size_of_val(&path[..]);
 
             let string = UNICODE_STRING {
                 Length: len as u16,
                 MaximumLength: len as u16,
-                Buffer: object_name.as_ptr() as *mut u16,
+                Buffer: path.as_ptr() as *mut u16,
             };
 
             let attributes = OBJECT_ATTRIBUTES {
@@ -102,6 +104,45 @@ impl Root {
             Ok(File::from_raw_handle(handle as *mut c_void))
         }
     }
+}
+
+fn encode_path_wide<P>(path: &P) -> io::Result<Vec<u16>>
+where
+    P: AsRef<RelativePath>,
+{
+    let path = path.as_ref();
+    let mut output = Vec::with_capacity(path.as_str().len() * 2);
+
+    let mut separator = [0; 2];
+    MAIN_SEPARATOR.encode_utf16(&mut separator);
+    let separator = &separator[..];
+
+    for c in path.components() {
+        if !output.is_empty() {
+            output.extend(MAIN_SEPARATOR_STR.encode_utf16());
+        }
+
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if output.is_empty() {
+                    return Err(io::Error::from_raw_os_error(ERROR_INVALID_PARAMETER as i32));
+                }
+
+                let index = output
+                    .windows(2)
+                    .rposition(|window| window == separator)
+                    .unwrap_or(0);
+
+                output.truncate(index);
+            }
+            Component::Normal(normal) => {
+                output.extend(normal.encode_utf16());
+            }
+        }
+    }
+
+    Ok(output)
 }
 
 unsafe impl Send for OpenOptions {}

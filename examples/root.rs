@@ -1,22 +1,18 @@
-use std::io::{Read, Seek, Write};
+use std::io::Read;
 
 use anyhow::{Context, Result};
 
 use relative_path::Root;
 
 fn main() -> Result<()> {
-    let root = Root::open(".")?;
+    let root = Root::new("..").context("Opening root directory")?;
 
     let mut cargo_toml = root
-        .open_options()
-        .write(true)
-        .append(true)
-        .open("test.txt")
+        .open("relative-path/Cargo.toml")
         .context("Opening file")?;
 
     let mut contents = String::new();
-    // cargo_toml.seek(std::io::SeekFrom::Start(0))?;
-    cargo_toml.write_all(b"Bye!\n")?;
+    cargo_toml.read_to_string(&mut contents)?;
     println!("{:?}", contents);
     Ok(())
 }

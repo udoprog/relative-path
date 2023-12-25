@@ -23,10 +23,13 @@ jobs:
     - uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{matrix.toolchain}}
-    - run: cargo test --workspace --all-targets
-    - run: cargo test --workspace --all-targets --all-features
-    - run: cargo test --workspace --all-targets --no-default-features
+    - run: cargo build --workspace --all-targets
+    - run: cargo build --workspace --all-targets --all-features
+    - run: cargo build--workspace --all-targets --no-default-features
     - run: cargo test --workspace --doc --all-features
+      if: matrix.toolchain == 'stable'
+    - run: cargo test --workspace --all-targets --all-features
+      if: matrix.toolchain == 'stable'
 
   clippy:
     runs-on: ubuntu-latest

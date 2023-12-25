@@ -8,7 +8,6 @@ use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
 use std::path::Path;
 use std::path::MAIN_SEPARATOR;
-use std::path::MAIN_SEPARATOR_STR;
 use std::ptr;
 
 use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
@@ -117,7 +116,7 @@ where
 
     for c in path.components() {
         if !output.is_empty() {
-            output.extend(MAIN_SEPARATOR_STR.encode_utf16());
+            output.extend_from_slice(MAIN_SEPARATOR.encode_utf16(&mut [0; 2]));
         }
 
         match c {

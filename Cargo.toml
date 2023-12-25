@@ -3,7 +3,7 @@ name = "relative-path"
 version = "1.9.0"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2018"
-rust-version = "1.56"
+rust-version = "1.63"
 description = "Portable, relative paths for Rust."
 documentation = "https://docs.rs/relative-path"
 readme = "README.md"
@@ -15,7 +15,7 @@ categories = ["filesystem"]
 
 [features]
 default = ["root"]
-root = ["dep:windows-sys"]
+root = ["dep:windows-sys", "dep:libc"]
 
 [dependencies]
 serde = { version = "1.0.160", optional = true }
@@ -35,6 +35,7 @@ features = [
 
 [target.'cfg(unix)'.dependencies.libc]
 version = "0.2.151"
+optional = true
 
 [dev-dependencies]
 anyhow = "1.0.76"

@@ -351,10 +351,8 @@ where
         let mut iter_next = iter.clone();
         match (iter_next.next(), prefix.next()) {
             (Some(x), Some(y)) if x == y => (),
-            (Some(_), Some(_)) => return None,
-            (Some(_), None) => return Some(iter),
-            (None, None) => return Some(iter),
-            (None, Some(_)) => return None,
+            (Some(_), Some(_)) | (None, Some(_)) => return None,
+            (Some(_), None) | (None, None) => return Some(iter),
         }
         iter = iter_next;
     }
@@ -404,7 +402,7 @@ impl<'a> Component<'a> {
     /// assert_eq!(&components, &[".", "tmp", "..", "foo", "bar.txt"]);
     /// ```
     pub fn as_str(self) -> &'a str {
-        use self::Component::*;
+        use self::Component::{CurDir, ParentDir, Normal};
 
         match self {
             CurDir => CURRENT_STR,
@@ -453,7 +451,7 @@ fn relative_traversal<'a, C>(buf: &mut RelativePathBuf, components: C)
 where
     C: IntoIterator<Item = Component<'a>>,
 {
-    use self::Component::*;
+    use self::Component::{CurDir, ParentDir, Normal};
 
     for c in components {
         match c {
@@ -678,7 +676,7 @@ impl RelativePathBuf {
     /// );
     /// ```
     pub fn from_path<P: AsRef<path::Path>>(path: P) -> Result<RelativePathBuf, FromPathError> {
-        use std::path::Component::*;
+        use std::path::Component::{Prefix, RootDir, CurDir, ParentDir, Normal};
 
         let mut buffer = RelativePathBuf::new();
 
@@ -1036,7 +1034,7 @@ impl RelativePath {
     pub fn from_path<P: ?Sized + AsRef<path::Path>>(
         path: &P,
     ) -> Result<&RelativePath, FromPathError> {
-        use std::path::Component::*;
+        use std::path::Component::{Prefix, RootDir, CurDir, ParentDir, Normal};
 
         let other = path.as_ref();
 
@@ -1088,6 +1086,7 @@ impl RelativePath {
     /// println!("{}", path.display());
     /// ```
     #[deprecated(note = "RelativePath implements std::fmt::Display directly")]
+    #[must_use]
     pub fn display(&self) -> Display {
         Display { path: self }
     }
@@ -1123,6 +1122,7 @@ impl RelativePath {
     /// assert_eq!(Some(Component::Normal("baz")), it.next());
     /// assert_eq!(None, it.next());
     /// ```
+    #[must_use]
     pub fn components(&self) -> Components {
         Components::new(&self.inner)
     }
@@ -1145,6 +1145,7 @@ impl RelativePath {
     /// assert_eq!(it.next(), Some("foo.txt"));
     /// assert_eq!(it.next(), None)
     /// ```
+    #[must_use]
     pub fn iter(&self) -> Iter {
         Iter {
             inner: self.components(),
@@ -1152,6 +1153,7 @@ impl RelativePath {
     }
 
     /// Convert to an owned [`RelativePathBuf`].
+    #[must_use]
     pub fn to_relative_path_buf(&self) -> RelativePathBuf {
         RelativePathBuf::from(self.inner.to_owned())
     }
@@ -1220,15 +1222,17 @@ impl RelativePath {
     /// Build an owned [`PathBuf`] relative to `base` for the current relative
     /// path.
     ///
-    /// This is similar to [`to_path`][RelativePath::to_path] except that it
-    /// doesn't just unconditionally append one path to the other, instead it
-    /// performs the following operations depending on its own components:
+    /// This is similar to [`to_path`] except that it doesn't just
+    /// unconditionally append one path to the other, instead it performs the
+    /// following operations depending on its own components:
     ///
-    /// * [Component::CurDir] leaves the `base` unmodified.
-    /// * [Component::ParentDir] removes a component from `base` using
-    ///   [path::PathBuf::pop].
-    /// * [Component::Normal] pushes the given path component onto `base` using
-    ///   the same mechanism as [`to_path`][RelativePath::to_path].
+    /// * [`Component::CurDir`] leaves the `base` unmodified.
+    /// * [`Component::ParentDir`] removes a component from `base` using
+    ///   [`path::PathBuf::pop`].
+    /// * [`Component::Normal`] pushes the given path component onto `base`
+    ///   using the same mechanism as [`to_path`].
+    ///
+    /// [`to_path`]: RelativePath::to_path
     ///
     /// Note that the exact semantics of the path operation is determined by the
     /// corresponding [`PathBuf`] operation. E.g. popping a component off a path
@@ -1293,7 +1297,7 @@ impl RelativePath {
     /// [`PathBuf`]: std::path::PathBuf
     /// [`PathBuf::push`]: std::path::PathBuf::push
     pub fn to_logical_path<P: AsRef<path::Path>>(&self, base: P) -> path::PathBuf {
-        use self::Component::*;
+        use self::Component::{CurDir, Normal, ParentDir};
 
         let mut p = base.as_ref().to_path_buf().into_os_string();
 
@@ -1329,8 +1333,9 @@ impl RelativePath {
     /// assert_eq!(Some(RelativePath::new("")), RelativePath::new("foo").parent());
     /// assert_eq!(None, RelativePath::new("").parent());
     /// ```
+    #[must_use]
     pub fn parent(&self) -> Option<&RelativePath> {
-        use self::Component::*;
+        use self::Component::CurDir;
 
         if self.inner.is_empty() {
             return None;
@@ -1361,8 +1366,9 @@ impl RelativePath {
     /// assert_eq!(None, RelativePath::new("foo.txt/..").file_name());
     /// assert_eq!(None, RelativePath::new("/").file_name());
     /// ```
+    #[must_use]
     pub fn file_name(&self) -> Option<&str> {
-        use self::Component::*;
+        use self::Component::{CurDir, ParentDir, Normal};
 
         let mut it = self.components();
 
@@ -1370,7 +1376,7 @@ impl RelativePath {
             return match c {
                 CurDir => continue,
                 Normal(name) => Some(name),
-                _ => None,
+                ParentDir => None,
             };
         }
 
@@ -1381,8 +1387,10 @@ impl RelativePath {
     ///
     /// # Errors
     ///
-    /// If `base` is not a prefix of `self` (i.e.
-    /// [starts_with][Self::starts_with] returns `false`), returns [`Err`].
+    /// If `base` is not a prefix of `self` (i.e. [`starts_with`] returns
+    /// `false`), returns [`Err`].
+    ///
+    /// [`starts_with`]: Self::starts_with
     ///
     /// # Examples
     ///
@@ -1464,6 +1472,7 @@ impl RelativePath {
     /// assert!(!RelativePath::new("foo/./baz.txt").is_normalized());
     /// assert!(!RelativePath::new("../foo/./bar/../baz.txt").is_normalized());
     /// ```
+    #[must_use]
     pub fn is_normalized(&self) -> bool {
         self.components()
             .skip_while(|c| matches!(c, Component::ParentDir))
@@ -1473,8 +1482,10 @@ impl RelativePath {
     /// Creates an owned [`RelativePathBuf`] like `self` but with the given file
     /// name.
     ///
-    /// See [set_file_name][RelativePathBuf::set_file_name] for more details.
+    /// See [`set_file_name`] for more details.
     ///
+    /// [`set_file_name`]: RelativePathBuf::set_file_name
+    /// 
     /// # Examples
     ///
     /// ```
@@ -1543,7 +1554,9 @@ impl RelativePath {
     /// Creates an owned [`RelativePathBuf`] like `self` but with the given
     /// extension.
     ///
-    /// See [set_extension][RelativePathBuf::set_extension] for more details.
+    /// See [`set_extension`] for more details.
+    ///
+    /// [`set_extension`]: RelativePathBuf::set_extension
     ///
     /// # Examples
     ///
@@ -1615,6 +1628,7 @@ impl RelativePath {
     ///     RelativePath::new(".").normalize()
     /// );
     /// ```
+    #[must_use]
     pub fn normalize(&self) -> RelativePathBuf {
         let mut buf = RelativePathBuf::with_capacity(self.inner.len());
         relative_traversal(&mut buf, self.components());
@@ -1821,7 +1835,7 @@ impl Clone for Box<RelativePath> {
     }
 }
 
-/// Conversion from [RelativePath] to [`Arc<RelativePath>`].
+/// Conversion from [`RelativePath`] to [`Arc<RelativePath>`].
 ///
 /// # Examples
 ///

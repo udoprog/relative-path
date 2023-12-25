@@ -71,7 +71,7 @@ macro_rules! t(
 fn assert_components(components: &[&str], path: &RelativePath) {
     let components = components
         .iter()
-        .cloned()
+        .copied()
         .map(Component::Normal)
         .collect::<Vec<_>>();
     let result: Vec<_> = path.components().collect();

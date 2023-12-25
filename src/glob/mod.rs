@@ -68,7 +68,8 @@ impl<'a> Glob<'a> {
         Self { root, components }
     }
 
-    /// Construct a new matcher.
+    /// Construct a new matcher over the compiled glob pattern.
+    #[must_use]
     pub fn matcher(&self) -> Matcher<'_> {
         Matcher {
             root: self.root,
@@ -254,23 +255,20 @@ impl<'a> Fragment<'a> {
         let mut start = None;
 
         for (n, c) in string.char_indices() {
-            match c {
-                '*' => {
-                    if let Some(s) = start.take() {
-                        parts.push(Part::Literal(&string[s..n]));
-                    }
-
-                    if mem::take(&mut literal) {
-                        parts.push(Part::Star);
-                    }
+            if c == '*' {
+                if let Some(s) = start.take() {
+                    parts.push(Part::Literal(&string[s..n]));
                 }
-                _ => {
-                    if start.is_none() {
-                        start = Some(n);
-                    }
 
-                    literal = true;
+                if mem::take(&mut literal) {
+                    parts.push(Part::Star);
                 }
+            } else {
+                if start.is_none() {
+                    start = Some(n);
+                }
+
+                literal = true;
             }
         }
 

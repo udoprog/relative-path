@@ -2,11 +2,12 @@
 //
 // See https://github.com/rust-lang/rust
 
-use std::fs::File;
+use std::ffi::OsString;
+use std::fs::{File, Metadata};
 use std::io::{self, Read, Write};
 use std::path::Path;
 
-use crate::RelativePath;
+use crate::{Glob, RelativePath};
 
 #[cfg_attr(windows, path = "windows.rs")]
 #[cfg_attr(unix, path = "unix.rs")]
@@ -45,7 +46,7 @@ impl Root {
         P: AsRef<Path>,
     {
         Ok(Self {
-            inner: imp::Root::new(path)?,
+            inner: imp::Root::new(path.as_ref())?,
         })
     }
 
@@ -196,13 +197,139 @@ impl Root {
     /// root.write("bar.txt", "dolor sit")?;
     /// # Ok::<_, std::io::Error>(())
     /// ```
-    /// ```
     pub fn write<P, C>(&self, path: P, contents: C) -> io::Result<()>
     where
         P: AsRef<RelativePath>,
         C: AsRef<[u8]>,
     {
         self.create(path)?.write_all(contents.as_ref())
+    }
+
+    /// Given a path, query the file system to get information about a file,
+    /// directory, etc.
+    ///
+    /// This function will traverse symbolic links to query information about
+    /// the destination file.
+    ///
+    /// # Platform-specific behavior
+    ///
+    /// This function currently corresponds to the `stat` function on Unix and
+    /// the `GetFileInformationByHandle` function on Windows. Note that, this
+    /// [may change in the future][changes].
+    ///
+    /// [changes]: io#platform-specific-behavior
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error in the following situations, but is
+    /// not limited to just these cases:
+    ///
+    /// * The user lacks permissions to perform `metadata` call on `path`.
+    /// * `path` does not exist.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use relative_path::Root;
+    ///
+    /// let root = Root::new(".")?;
+    /// let attr = root.metadata("file/path.txt")?;
+    /// # Ok::<_, std::io::Error>(())
+    /// ```
+    pub fn metadata<P>(&self, path: P) -> io::Result<Metadata>
+    where
+        P: AsRef<RelativePath>,
+    {
+        self.inner.metadata(path.as_ref())
+    }
+
+    /// Returns an iterator over the entries within a directory.
+    ///
+    /// The iterator will yield instances of <code>[io::Result]<[DirEntry]></code>.
+    /// New errors may be encountered after an iterator is initially constructed.
+    /// Entries for the current and parent directories (typically `.` and `..`) are
+    /// skipped.
+    ///
+    /// # Platform-specific behavior
+    ///
+    /// This function currently corresponds to the `opendir` function on Unix
+    /// and the `FindFirstFile` function on Windows. Advancing the iterator
+    /// currently corresponds to `readdir` on Unix and `FindNextFile` on Windows.
+    /// Note that, this [may change in the future][changes].
+    ///
+    /// [changes]: io#platform-specific-behavior
+    ///
+    /// The order in which this iterator returns entries is platform and filesystem
+    /// dependent.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error in the following situations, but is not
+    /// limited to just these cases:
+    ///
+    /// * The provided `path` doesn't exist.
+    /// * The process lacks permissions to view the contents.
+    /// * The `path` points at a non-directory file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::io;
+    /// use std::fs::{self, DirEntry};
+    /// use std::path::Path;
+    ///
+    /// // one possible implementation of walking a directory only visiting files
+    /// fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
+    ///     if dir.is_dir() {
+    ///         for entry in fs::read_dir(dir)? {
+    ///             let entry = entry?;
+    ///             let path = entry.path();
+    ///             if path.is_dir() {
+    ///                 visit_dirs(&path, cb)?;
+    ///             } else {
+    ///                 cb(&entry);
+    ///             }
+    ///         }
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// ```rust,no_run
+    /// use std::{fs, io};
+    ///
+    /// fn main() -> io::Result<()> {
+    ///     let mut entries = fs::read_dir(".")?
+    ///         .map(|res| res.map(|e| e.path()))
+    ///         .collect::<Result<Vec<_>, io::Error>>()?;
+    ///
+    ///     // The order in which `read_dir` returns entries is not guaranteed. If reproducible
+    ///     // ordering is required the entries should be explicitly sorted.
+    ///
+    ///     entries.sort();
+    ///
+    ///     // The entries have now been sorted by their path.
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn read_dir<P>(&self, path: P) -> io::Result<ReadDir>
+    where
+        P: AsRef<RelativePath>,
+    {
+        self.inner
+            .read_dir(path.as_ref())
+            .map(|inner| ReadDir { inner })
+    }
+
+    /// Parse a glob over the specified path.
+    ///
+    /// To perform the globbing, use [`Glob::matcher`].
+    pub fn glob<'a, P>(&'a self, path: &'a P) -> io::Result<Glob<'a>>
+    where
+        P: ?Sized + AsRef<RelativePath>,
+    {
+        Ok(Glob::new(self, path.as_ref()))
     }
 }
 
@@ -474,6 +601,78 @@ impl<'a> OpenOptions<'a> {
     where
         P: AsRef<RelativePath>,
     {
-        self.root.open_at(path, &self.options)
+        self.root.open_at(path.as_ref(), &self.options)
+    }
+}
+
+/// Iterator over the entries in a directory.
+///
+/// This iterator is returned from the [`Root::read_dir`] function and will
+/// yield instances of <code>[io::Result]<[DirEntry]></code>. Through a
+/// [`DirEntry`] information like the entry's path and possibly other metadata
+/// can be learned.
+///
+/// The order in which this iterator returns entries is platform and filesystem
+/// dependent.
+///
+/// # Errors
+///
+/// This [`io::Result`] will be an [`Err`] if there's some sort of intermittent
+/// IO error during iteration.
+pub struct ReadDir {
+    inner: imp::ReadDir,
+}
+
+impl Iterator for ReadDir {
+    type Item = io::Result<DirEntry>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let inner = self.inner.next()?;
+        Some(inner.map(|inner| DirEntry { inner }))
+    }
+}
+
+/// Entries returned by the [`ReadDir`] iterator.
+///
+/// An instance of `DirEntry` represents an entry inside of a directory on the
+/// filesystem. Each entry can be inspected via methods to learn about the full
+/// path or possibly other metadata through per-platform extension traits.
+///
+/// # Platform-specific behavior
+///
+/// On Unix, the `DirEntry` struct contains an internal reference to the open
+/// directory. Holding `DirEntry` objects will consume a file handle even after
+/// the `ReadDir` iterator is dropped.
+pub struct DirEntry {
+    inner: imp::DirEntry,
+}
+
+impl DirEntry {
+    /// Returns the file name of this directory entry without any
+    /// leading path component(s).
+    ///
+    /// As an example,
+    /// the output of the function will result in "foo" for all the following paths:
+    /// - "./foo"
+    /// - "/the/foo"
+    /// - "../../foo"
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use relative_path::Root;
+    ///
+    /// let mut root = Root::new(".")?;
+    ///
+    /// for entry in root.read_dir("src")? {
+    ///     let entry = entry?;
+    ///     println!("{:?}", entry.file_name());
+    /// }
+    /// # Ok::<_, std::io::Error>(())
+    /// ```
+    #[must_use]
+    pub fn file_name(&self) -> OsString {
+        self.inner.file_name()
     }
 }

@@ -2,7 +2,7 @@
 name = "relative-path"
 version = "1.9.0"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
-edition = "2018"
+edition = "2021"
 rust-version = "1.63"
 description = "Portable, relative paths for Rust."
 documentation = "https://docs.rs/relative-path"
@@ -26,9 +26,11 @@ optional = true
 features = [
     "Wdk_Foundation",
     "Wdk_Storage_FileSystem",
+    "Wdk_System_SystemServices",
     "Win32_Foundation",
     "Win32_Storage_FileSystem",
     "Win32_System_IO",
+    "Win32_System_WindowsProgramming",
     "Win32_Security",
     "Win32_System_Kernel",
 ]

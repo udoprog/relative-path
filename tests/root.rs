@@ -39,12 +39,52 @@ fn files(list: &[(&'static str, Option<&'static str>)]) {
 
 #[test]
 fn relative_open() -> Result<()> {
-    files(&[("src/root/first", Some("first content"))]);
+    files(&[("relative_open/src/root/first", Some("first content"))]);
 
     let r1 = root("src/root");
     assert_eq!(r1.read_to_string("first")?, "first content");
 
     let r2 = root("src");
     assert_eq!(r2.read_to_string("root/first")?, "first content");
+    Ok(())
+}
+
+#[test]
+fn read_dir() -> Result<()> {
+    files(&[("read_dir/src/root/first", Some("first content"))]);
+    files(&[("read_dir/src/root/second", Some("second content"))]);
+
+    let r1 = root(".");
+    let d = r1.read_dir("read_dir/src/root")?;
+
+    let mut values = Vec::new();
+
+    for e in d {
+        let e = e?;
+        values.push(e.file_name().to_string_lossy().into_owned());
+    }
+
+    values.sort();
+
+    assert_eq!(values, vec!["first", "second"]);
+    Ok(())
+}
+
+#[test]
+fn glob() -> Result<()> {
+    files(&[("glob/src/root/first", Some("first content"))]);
+    files(&[("glob/src/root/second", Some("second content"))]);
+
+    let r1 = root("glob");
+    let glob = r1.glob("**/root/*")?;
+
+    let mut results = Vec::new();
+
+    for e in glob.matcher() {
+        results.push(e?);
+    }
+
+    results.sort();
+    assert_eq!(results, vec!["src/root/first", "src/root/second"]);
     Ok(())
 }

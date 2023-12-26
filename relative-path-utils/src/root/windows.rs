@@ -79,7 +79,7 @@ impl Root {
 
             let status = nt::NtCreateFile(
                 handle.as_mut_ptr(),
-                options.get_access_mode()?,
+                c::SYNCHRONIZE | options.get_access_mode()?,
                 &attributes,
                 &mut status_block,
                 ptr::null_mut(),
@@ -141,7 +141,7 @@ impl Root {
             self.handle.try_clone()?
         } else {
             let mut opts = OpenOptions::new();
-            opts.access_mode = Some(c::SYNCHRONIZE | c::FILE_LIST_DIRECTORY);
+            opts.access_mode = Some(c::FILE_LIST_DIRECTORY);
             self.open_at_inner(path, &opts)?
         };
 
@@ -413,7 +413,7 @@ impl OpenOptions {
             }
         };
 
-        Ok(access_mode | c::SYNCHRONIZE)
+        Ok(access_mode)
     }
 
     fn get_creation_mode(&self) -> io::Result<u32> {

@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use relative_path::Root;
+use relative_path_utils::Root;
 
 const PATH: &str = env!("CARGO_TARGET_TMPDIR");
 

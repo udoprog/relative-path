@@ -7,7 +7,8 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
 
-use crate::{Glob, RelativePath};
+use crate::Glob;
+use relative_path::RelativePath;
 
 #[cfg_attr(windows, path = "windows.rs")]
 #[cfg_attr(unix, path = "unix.rs")]
@@ -36,7 +37,7 @@ impl Root {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     /// # Ok::<_, std::io::Error>(())
@@ -55,7 +56,7 @@ impl Root {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -86,7 +87,7 @@ impl Root {
     /// ```no_run
     /// use std::io::Write;
     ///
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -119,7 +120,7 @@ impl Root {
     /// ```no_run
     /// use std::io::Read;
     ///
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -156,7 +157,7 @@ impl Root {
     /// ```no_run
     /// use std::net::SocketAddr;
     ///
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     /// let foo: SocketAddr = String::from_utf8_lossy(&root.read("address.txt")?).parse()?;
@@ -201,7 +202,7 @@ impl Root {
     /// ```no_run
     /// use std::net::SocketAddr;
     ///
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     /// let foo: SocketAddr = root.read_to_string("address.txt")?.parse()?;
@@ -245,7 +246,7 @@ impl Root {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -286,7 +287,7 @@ impl Root {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     /// let attr = root.metadata("file/path.txt")?;
@@ -313,7 +314,7 @@ impl Root {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -367,7 +368,8 @@ impl Root {
     /// ```
     /// use std::io;
     ///
-    /// use relative_path::{RelativePath, Root, DirEntry};
+    /// use relative_path_utils::{Root, DirEntry};
+    /// use relative_path::RelativePath;
     ///
     /// // one possible implementation of walking a directory only visiting files
     /// fn visit_dirs(root: &Root, dir: &RelativePath, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
@@ -404,7 +406,7 @@ impl Root {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new("src")?;
     ///
@@ -446,7 +448,7 @@ impl Root {
 /// Opening a file to read:
 ///
 /// ```no_run
-/// use relative_path::Root;
+/// use relative_path_utils::Root;
 ///
 /// let root = Root::new(".")?;
 ///
@@ -458,7 +460,7 @@ impl Root {
 /// doesn't exist:
 ///
 /// ```no_run
-/// use relative_path::Root;
+/// use relative_path_utils::Root;
 ///
 /// let root = Root::new(".")?;
 ///
@@ -486,7 +488,7 @@ impl<'a> OpenOptions<'a> {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -509,7 +511,7 @@ impl<'a> OpenOptions<'a> {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -558,7 +560,7 @@ impl<'a> OpenOptions<'a> {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -580,7 +582,7 @@ impl<'a> OpenOptions<'a> {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -603,7 +605,7 @@ impl<'a> OpenOptions<'a> {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -636,7 +638,7 @@ impl<'a> OpenOptions<'a> {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -681,7 +683,7 @@ impl<'a> OpenOptions<'a> {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///
@@ -757,7 +759,7 @@ impl DirEntry {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let mut root = Root::new(".")?;
     ///
@@ -793,7 +795,7 @@ impl Metadata {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new(".")?;
     ///

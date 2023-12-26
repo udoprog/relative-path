@@ -6,7 +6,9 @@ use std::fmt;
 use std::io;
 use std::mem;
 
-use crate::{RelativePath, RelativePathBuf, Root};
+use relative_path::{RelativePath, RelativePathBuf};
+
+use crate::Root;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -73,7 +75,7 @@ impl<'a> Glob<'a> {
     /// # Examples
     ///
     /// ```no_run
-    /// use relative_path::Root;
+    /// use relative_path_utils::Root;
     ///
     /// let root = Root::new("src")?;
     ///
@@ -182,7 +184,7 @@ impl<'a> Iterator for Matcher<'a> {
             while let [first, rest @ ..] = components {
                 match first {
                     Component::ParentDir => {
-                        path = path.join(crate::Component::ParentDir);
+                        path = path.join(relative_path::Component::ParentDir);
                     }
                     Component::Normal(normal) => {
                         path = path.join(normal);
@@ -230,10 +232,10 @@ fn compile_pattern(pattern: &RelativePath) -> Vec<Component<'_>> {
 
     for c in pattern.components() {
         output.push(match c {
-            crate::Component::CurDir => continue,
-            crate::Component::ParentDir => Component::ParentDir,
-            crate::Component::Normal("**") => Component::StarStar,
-            crate::Component::Normal(normal) => {
+            relative_path::Component::CurDir => continue,
+            relative_path::Component::ParentDir => Component::ParentDir,
+            relative_path::Component::Normal("**") => Component::StarStar,
+            relative_path::Component::Normal(normal) => {
                 let fragment = Fragment::parse(normal);
 
                 if let Some(normal) = fragment.as_literal() {

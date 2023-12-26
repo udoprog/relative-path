@@ -41,3 +41,6 @@ errno = { version = "0.3.8", optional = true }
 [dev-dependencies]
 anyhow = "1.0.76"
 serde = { version = "1.0.160", features = ["derive"] }
+
+[package.metadata.docs.rs]
+all-features = true

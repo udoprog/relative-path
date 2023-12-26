@@ -128,8 +128,34 @@ impl Root {
 
             let info = info.assume_init();
 
+            let mut reparse_tag = 0;
+
+            if info.dwFileAttributes & c::FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+                let mut attr_tag = MaybeUninit::<c::FILE_ATTRIBUTE_TAG_INFO>::zeroed();
+
+                let result = c::GetFileInformationByHandleEx(
+                    self.handle.as_raw_handle() as isize,
+                    c::FileAttributeTagInfo,
+                    attr_tag.as_mut_ptr().cast(),
+                    mem::size_of::<c::FILE_ATTRIBUTE_TAG_INFO>()
+                        .try_into()
+                        .unwrap(),
+                );
+
+                if result == FALSE {
+                    return Err(io::Error::last_os_error());
+                }
+
+                let attr_tag = attr_tag.assume_init();
+
+                if attr_tag.FileAttributes & c::FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+                    reparse_tag = attr_tag.ReparseTag;
+                }
+            }
+
             Ok(Metadata {
                 attributes: info.dwFileAttributes,
+                reparse_tag,
             })
         }
     }
@@ -440,12 +466,50 @@ impl OpenOptions {
 #[derive(Clone)]
 pub(super) struct Metadata {
     attributes: u32,
+    reparse_tag: u32,
 }
 
 impl Metadata {
     #[inline]
     pub(super) fn is_dir(&self) -> bool {
+        !self.is_symlink() && self.is_directory()
+    }
+
+    #[inline]
+    pub(super) fn is_file(&self) -> bool {
+        !self.is_symlink() && !self.is_directory()
+    }
+
+    #[inline]
+    pub(super) fn is_symlink(&self) -> bool {
+        self.is_reparse_point() && self.is_reparse_tag_name_surrogate()
+    }
+
+    #[inline]
+    #[allow(unused)]
+    pub(super) fn is_symlink_dir(&self) -> bool {
+        self.is_symlink() && self.is_directory()
+    }
+
+    #[inline]
+    #[allow(unused)]
+    pub(super) fn is_symlink_file(&self) -> bool {
+        self.is_symlink() && !self.is_directory()
+    }
+
+    #[inline]
+    fn is_directory(&self) -> bool {
         self.attributes & c::FILE_ATTRIBUTE_DIRECTORY != 0
+    }
+
+    #[inline]
+    fn is_reparse_point(&self) -> bool {
+        self.attributes & c::FILE_ATTRIBUTE_REPARSE_POINT != 0
+    }
+
+    #[inline]
+    fn is_reparse_tag_name_surrogate(&self) -> bool {
+        self.reparse_tag & 0x2000_0000 != 0
     }
 }
 

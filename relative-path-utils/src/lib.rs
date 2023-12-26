@@ -15,7 +15,7 @@
 
 #[cfg(feature = "root")]
 #[doc(inline)]
-pub use self::root::{DirEntry, OpenOptions, ReadDir, Root};
+pub use self::root::{DirEntry, Metadata, OpenOptions, ReadDir, Root};
 #[cfg(feature = "root")]
 mod root;
 

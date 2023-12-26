@@ -388,7 +388,27 @@ pub(super) struct Metadata {
 impl Metadata {
     #[inline]
     pub(super) fn is_dir(&self) -> bool {
-        self.stat.st_mode & libc::S_IFMT == libc::S_IFDIR
+        self.is(libc::S_IFDIR)
+    }
+
+    #[inline]
+    pub(super) fn is_file(&self) -> bool {
+        self.is(libc::S_IFREG)
+    }
+
+    #[inline]
+    pub(super) fn is_symlink(&self) -> bool {
+        self.is(libc::S_IFLNK)
+    }
+
+    #[inline]
+    pub(super) fn is(&self, mode: libc::mode_t) -> bool {
+        self.masked() == mode
+    }
+
+    #[inline]
+    fn masked(&self) -> libc::mode_t {
+        self.stat.st_mode & libc::S_IFMT
     }
 }
 

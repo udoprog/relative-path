@@ -1,27 +1,27 @@
-use std::ffi::c_char;
-use std::ffi::{CStr, CString, OsString};
+use std::ffi::{CString, OsString};
 use std::fs::File;
 use std::io;
-use std::mem::{size_of, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
-use std::os::unix::ffi::OsStringExt;
 use std::path::Path;
 
 #[cfg(not(any(
+    all(target_os = "linux", not(target_env = "musl")),
+    target_os = "emscripten",
+    target_os = "l4re",
     target_os = "android",
-    target_os = "linux",
-    target_os = "solaris",
-    target_os = "fuchsia",
-    target_os = "redox",
-    target_os = "illumos",
-    target_os = "aix",
-    target_os = "nto",
-    target_os = "vita",
     target_os = "hurd",
 )))]
-compile_error!("Unix platform is not supported");
+use libc::{fstat as fstat64, stat as stat64};
+#[cfg(any(
+    all(target_os = "linux", not(target_env = "musl")),
+    target_os = "emscripten",
+    target_os = "l4re",
+    target_os = "hurd"
+))]
+use libc::{fstat64, stat64};
 
 use crate::{Component, RelativePath};
 
@@ -71,7 +71,7 @@ impl Root {
         unsafe {
             let mut stat = MaybeUninit::zeroed();
 
-            if libc::fstat64(fd.as_raw_fd(), stat.as_mut_ptr()) == -1 {
+            if fstat64(fd.as_raw_fd(), stat.as_mut_ptr()) == -1 {
                 return Err(io::Error::last_os_error());
             }
 
@@ -117,62 +117,164 @@ pub(super) struct ReadDir {
 impl Iterator for ReadDir {
     type Item = io::Result<DirEntry>;
 
-    fn next(&mut self) -> Option<io::Result<DirEntry>> {
-        const D_NAME_OFFSET: usize = size_of::<libc::ino64_t>()
-            + size_of::<libc::off64_t>()
-            + size_of::<libc::c_ushort>()
-            + size_of::<libc::c_uchar>();
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner_next()
+    }
+}
 
-        if self.end_of_stream {
-            return None;
-        }
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "solaris",
+    target_os = "fuchsia",
+    target_os = "redox",
+    target_os = "illumos",
+    target_os = "aix",
+    target_os = "nto",
+    target_os = "vita",
+    target_os = "hurd",
+))]
+mod read_dir {
+    use std::ffi::c_char;
+    use std::ffi::CStr;
+    use std::ffi::OsString;
+    use std::io;
+    use std::mem::size_of;
+    use std::os::unix::ffi::OsStringExt;
 
-        unsafe {
-            loop {
-                // As of POSIX.1-2017, readdir() is not required to be thread safe; only
-                // readdir_r() is. However, readdir_r() cannot correctly handle platforms
-                // with unlimited or variable NAME_MAX. Many modern platforms guarantee
-                // thread safety for readdir() as long an individual DIR* is not accessed
-                // concurrently, which is sufficient for Rust.
-                errno::set_errno(errno::Errno(0));
-                let entry_ptr = libc::readdir64(self.dir.handle);
+    use super::{DirEntry, ReadDir};
 
-                if entry_ptr.is_null() {
-                    // We either encountered an error, or reached the end. Either way,
-                    // the next call to next() should return None.
-                    self.end_of_stream = true;
+    impl ReadDir {
+        pub(super) fn inner_next(&mut self) -> Option<io::Result<DirEntry>> {
+            const D_NAME_OFFSET: usize = size_of::<libc::ino64_t>()
+                + size_of::<libc::off64_t>()
+                + size_of::<libc::c_ushort>()
+                + size_of::<libc::c_uchar>();
 
-                    // To distinguish between errors and end-of-directory, we had to clear
-                    // errno beforehand to check for an error now.
-                    return match errno::errno().0 {
-                        0 => None,
-                        e => Some(Err(io::Error::from_raw_os_error(e))),
-                    };
+            if self.end_of_stream {
+                return None;
+            }
+
+            unsafe {
+                loop {
+                    // As of POSIX.1-2017, readdir() is not required to be thread safe; only
+                    // readdir_r() is. However, readdir_r() cannot correctly handle platforms
+                    // with unlimited or variable NAME_MAX. Many modern platforms guarantee
+                    // thread safety for readdir() as long an individual DIR* is not accessed
+                    // concurrently, which is sufficient for Rust.
+                    errno::set_errno(errno::Errno(0));
+                    let entry_ptr = libc::readdir64(self.dir.handle);
+
+                    if entry_ptr.is_null() {
+                        // We either encountered an error, or reached the end. Either way,
+                        // the next call to next() should return None.
+                        self.end_of_stream = true;
+
+                        // To distinguish between errors and end-of-directory, we had to clear
+                        // errno beforehand to check for an error now.
+                        return match errno::errno().0 {
+                            0 => None,
+                            e => Some(Err(io::Error::from_raw_os_error(e))),
+                        };
+                    }
+
+                    // d_name is guaranteed to be null-terminated.
+                    let name =
+                        CStr::from_ptr(entry_ptr.cast::<u8>().add(D_NAME_OFFSET).cast::<c_char>());
+
+                    let name_bytes = name.to_bytes();
+
+                    if name_bytes == b"." || name_bytes == b".." {
+                        continue;
+                    }
+
+                    return Some(Ok(DirEntry {
+                        file_name: OsString::from_vec(name_bytes.to_vec()),
+                    }));
                 }
-
-                // d_name is guaranteed to be null-terminated.
-                let name =
-                    CStr::from_ptr(entry_ptr.cast::<u8>().add(D_NAME_OFFSET).cast::<c_char>());
-
-                let name_bytes = name.to_bytes();
-                if name_bytes == b"." || name_bytes == b".." {
-                    continue;
-                }
-
-                return Some(Ok(DirEntry {
-                    file_name: OsString::from_vec(name_bytes.to_vec()),
-                }));
             }
         }
     }
 }
 
-pub(super) struct DirEntry {
+#[cfg(not(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "solaris",
+    target_os = "fuchsia",
+    target_os = "redox",
+    target_os = "illumos",
+    target_os = "aix",
+    target_os = "nto",
+    target_os = "vita",
+    target_os = "hurd",
+)))]
+mod read_dir {
+    use std::ffi::OsString;
+    use std::io;
+    use std::mem::MaybeUninit;
+    use std::os::unix::ffi::OsStringExt;
+    use std::ptr;
+    use std::slice;
+
+    use super::{DirEntry, ReadDir};
+
+    impl ReadDir {
+        pub(super) fn inner_next(&mut self) -> Option<io::Result<DirEntry>> {
+            if self.end_of_stream {
+                return None;
+            }
+
+            unsafe {
+                loop {
+                    let mut entry = MaybeUninit::zeroed();
+                    let mut entry_ptr = ptr::null_mut();
+
+                    let err = libc::readdir_r(self.dir.handle, entry.as_mut_ptr(), &mut entry_ptr);
+
+                    if err != 0 {
+                        if entry_ptr.is_null() {
+                            // We encountered an error (which will be returned in this iteration), but
+                            // we also reached the end of the directory stream. The `end_of_stream`
+                            // flag is enabled to make sure that we return `None` in the next iteration
+                            // (instead of looping forever)
+                            self.end_of_stream = true;
+                        }
+
+                        return Some(Err(io::Error::from_raw_os_error(err)));
+                    }
+
+                    if entry_ptr.is_null() {
+                        return None;
+                    }
+
+                    let entry = entry.assume_init();
+
+                    let name_bytes = slice::from_raw_parts(
+                        entry.d_name.as_ptr() as *const u8,
+                        entry.d_namlen as usize,
+                    );
+
+                    if name_bytes == b"." || name_bytes == b".." {
+                        continue;
+                    }
+
+                    return Some(Ok(DirEntry {
+                        file_name: OsString::from_vec(name_bytes.to_vec()),
+                    }));
+                }
+            }
+        }
+    }
+}
+
+pub(crate) struct DirEntry {
     file_name: OsString,
 }
 
 impl DirEntry {
-    pub(super) fn file_name(&self) -> OsString {
+    pub(crate) fn file_name(&self) -> OsString {
         self.file_name.to_owned()
     }
 }
@@ -280,7 +382,7 @@ impl OpenOptions {
 
 #[derive(Clone)]
 pub(super) struct Metadata {
-    stat: libc::stat64,
+    stat: stat64,
 }
 
 impl Metadata {

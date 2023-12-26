@@ -58,16 +58,16 @@ impl Root {
         unsafe {
             let len = mem::size_of_val(&path[..]);
 
-            let string = UNICODE_STRING {
-                Length: len as u16,
-                MaximumLength: len as u16,
-                Buffer: path.as_ptr() as *mut u16,
+            let object_name = UNICODE_STRING {
+                Length: len as _,
+                MaximumLength: len as _,
+                Buffer: path.as_ptr() as *mut _,
             };
 
             let attributes = OBJECT_ATTRIBUTES {
                 Length: size_of::<OBJECT_ATTRIBUTES>() as u32,
                 RootDirectory: self.handle.as_raw_handle() as HANDLE,
-                ObjectName: &string,
+                ObjectName: &object_name,
                 Attributes: 0,
                 SecurityDescriptor: ptr::null(),
                 SecurityQualityOfService: ptr::null(),
@@ -271,15 +271,7 @@ fn is_current(path: &RelativePath) -> bool {
 fn encode_path_wide(path: &RelativePath) -> io::Result<Vec<u16>> {
     let mut output = Vec::with_capacity(path.as_str().len() * 2);
 
-    let mut separator = [0; 2];
-    MAIN_SEPARATOR.encode_utf16(&mut separator);
-    let separator = &separator[..];
-
     for c in path.components() {
-        if !output.is_empty() {
-            output.extend_from_slice(MAIN_SEPARATOR.encode_utf16(&mut [0; 2]));
-        }
-
         match c {
             Component::CurDir => {}
             Component::ParentDir => {
@@ -288,16 +280,24 @@ fn encode_path_wide(path: &RelativePath) -> io::Result<Vec<u16>> {
                 }
 
                 let index = output
-                    .windows(2)
-                    .rposition(|window| window == separator)
+                    .iter()
+                    .rposition(|window| *window == MAIN_SEPARATOR as u8 as u16)
                     .unwrap_or(0);
 
-                output.truncate(index * 2);
+                output.truncate(index);
             }
             Component::Normal(normal) => {
+                if !output.is_empty() {
+                    output.extend_from_slice(MAIN_SEPARATOR.encode_utf16(&mut [0; 2]));
+                }
+
                 output.extend(normal.encode_utf16());
             }
         }
+    }
+
+    if output.is_empty() {
+        output.extend_from_slice('.'.encode_utf16(&mut [0; 2]));
     }
 
     Ok(output)

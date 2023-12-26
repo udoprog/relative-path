@@ -88,3 +88,36 @@ fn glob() -> Result<()> {
     assert_eq!(results, vec!["src/root/first", "src/root/second"]);
     Ok(())
 }
+
+#[test]
+fn read_root_dir() -> Result<()> {
+    files(&[("read_root_dir/first", Some("first content"))]);
+
+    let r1 = root("read_root_dir");
+
+    let mut values = Vec::new();
+
+    for e in r1.read_dir("")? {
+        let e = e?;
+        values.push(e.file_name().to_string_lossy().into_owned());
+    }
+
+    for e in r1.read_dir("")? {
+        let e = e?;
+        values.push(e.file_name().to_string_lossy().into_owned());
+    }
+
+    assert_eq!(values, vec!["first", "first"]);
+    Ok(())
+}
+
+#[test]
+fn test_parent_dir() -> Result<()> {
+    files(&[("test_parent_dir/foo/bar/first", Some("first content"))]);
+    files(&[("test_parent_dir/foo/second", Some("second content"))]);
+
+    let r1 = root("test_parent_dir");
+    assert_eq!(r1.read_to_string("foo/bar/../second")?, "second content");
+    assert!(r1.read_to_string("../second").is_err());
+    Ok(())
+}

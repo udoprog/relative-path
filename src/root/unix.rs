@@ -2,10 +2,10 @@ use std::ffi::{CString, OsString};
 use std::fs::File;
 use std::io;
 use std::mem::MaybeUninit;
-use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
-use std::path::Path;
+use std::os::fd::{AsFd, AsRawFd};
+use std::path::{Path, MAIN_SEPARATOR};
 
 #[cfg(not(any(
     all(target_os = "linux", not(target_env = "musl")),
@@ -60,12 +60,15 @@ impl Root {
     }
 
     pub(super) fn metadata(&self, path: &RelativePath) -> io::Result<Metadata> {
+        let owned;
+
         let fd = if is_current(path) {
-            self.handle.try_clone()?
+            self.handle.as_fd()
         } else {
             let mut opts = OpenOptions::new();
             opts.read(true);
-            self.open_at_inner(path, &opts)?
+            owned = self.open_at_inner(path, &opts)?;
+            owned.as_fd()
         };
 
         unsafe {
@@ -82,13 +85,9 @@ impl Root {
     }
 
     pub(super) fn read_dir(&self, path: &RelativePath) -> io::Result<ReadDir> {
-        let fd = if is_current(path) {
-            self.handle.try_clone()?
-        } else {
-            let mut opts = OpenOptions::new();
-            opts.read(true);
-            self.open_at_inner(path, &opts)?
-        };
+        let mut opts = OpenOptions::new();
+        opts.read(true);
+        let fd = self.open_at_inner(path, &opts)?;
 
         let dir = unsafe {
             let handle = libc::fdopendir(fd.as_raw_fd());
@@ -400,10 +399,6 @@ fn convert_to_c_string(input: &RelativePath) -> io::Result<CString> {
     let mut path = Vec::new();
 
     for c in input.components() {
-        if !path.is_empty() {
-            path.push(b'/');
-        }
-
         match c {
             Component::CurDir => {}
             Component::ParentDir => {
@@ -411,7 +406,10 @@ fn convert_to_c_string(input: &RelativePath) -> io::Result<CString> {
                     return Err(io::Error::from_raw_os_error(libc::EINVAL));
                 }
 
-                let index = path.iter().rposition(|&b| b == b'/').unwrap_or(0);
+                let index = path
+                    .iter()
+                    .rposition(|&b| b == MAIN_SEPARATOR as u8)
+                    .unwrap_or(0);
                 path.truncate(index);
             }
             Component::Normal(normal) => {
@@ -419,9 +417,17 @@ fn convert_to_c_string(input: &RelativePath) -> io::Result<CString> {
                     return Err(io::Error::from_raw_os_error(libc::EINVAL));
                 }
 
+                if !path.is_empty() {
+                    path.push(b'/');
+                }
+
                 path.extend_from_slice(normal.as_bytes());
             }
         }
+    }
+
+    if path.is_empty() {
+        path.push(b'.');
     }
 
     path.push(0);

@@ -22,6 +22,10 @@ use windows_sys::Win32::System::IO::IO_STATUS_BLOCK;
 
 use relative_path::{Component, RelativePath};
 
+#[allow(clippy::cast_possible_wrap)]
+const EINVAL: i32 = ERROR_INVALID_PARAMETER as i32;
+const MAIN_SEPARATOR_U16: u16 = MAIN_SEPARATOR as u16;
+
 #[derive(Debug)]
 pub(super) struct Root {
     handle: OwnedHandle,
@@ -53,13 +57,7 @@ impl Root {
 
         // SAFETY: All the operations and parameters are correctly used.
         unsafe {
-            let len = mem::size_of_val(&path[..]);
-
-            let object_name = UNICODE_STRING {
-                Length: len as _,
-                MaximumLength: len as _,
-                Buffer: path.as_ptr() as *mut _,
-            };
+            let object_name = unicode_string_ref(&path)?;
 
             let attributes = OBJECT_ATTRIBUTES {
                 Length: size_of::<OBJECT_ATTRIBUTES>() as u32,
@@ -149,18 +147,45 @@ impl Root {
 
         Ok(ReadDir {
             handle,
-            buffer: Aligned([], [0; 1024]),
+            buffer: AlignedBuf::new(),
             at: None,
             first: true,
         })
     }
 }
 
-struct Aligned<T>([nt::FILE_NAMES_INFORMATION; 0], T);
+#[repr(C)]
+struct AlignedBuf<T, const N: usize> {
+    _align: [T; 0],
+    buf: [u8; N],
+}
+
+impl<T, const N: usize> AlignedBuf<T, N> {
+    fn new() -> Self {
+        Self {
+            _align: [],
+            buf: [0; N],
+        }
+    }
+
+    #[allow(clippy::cast_possible_truncation, clippy::unused_self)]
+    fn len(&self) -> u32 {
+        N as u32
+    }
+
+    unsafe fn as_ptr_at(&self, at: usize) -> *const T {
+        assert!(at % align_of::<T>() == 0);
+        self.buf.as_ptr().add(at).cast()
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut u8 {
+        self.buf.as_mut_ptr()
+    }
+}
 
 pub(super) struct ReadDir {
     handle: OwnedHandle,
-    buffer: Aligned<[u8; 1024]>,
+    buffer: AlignedBuf<nt::FILE_NAMES_INFORMATION, 1024>,
     first: bool,
     at: Option<usize>,
 }
@@ -172,11 +197,10 @@ impl Iterator for ReadDir {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             while let Some(at) = self.at.take() {
-                assert!(at % align_of::<nt::FILE_NAMES_INFORMATION>() == 0);
-
                 unsafe {
-                    let file_names = &*self.buffer.1[at..]
-                        .as_ptr()
+                    let file_names = &*self
+                        .buffer
+                        .as_ptr_at(at)
                         .cast::<nt::FILE_NAMES_INFORMATION>();
 
                     let len = file_names.FileNameLength;
@@ -207,8 +231,8 @@ impl Iterator for ReadDir {
                     None,
                     ptr::null(),
                     &mut status_block,
-                    self.buffer.1.as_mut_ptr().cast(),
-                    self.buffer.1.len() as u32,
+                    self.buffer.as_mut_ptr().cast(),
+                    self.buffer.len(),
                     12, // FileNamesInformation
                     if mem::take(&mut self.first) {
                         SL_RESTART_SCAN
@@ -257,7 +281,7 @@ impl DirEntry {
     }
 
     pub(super) fn file_name(&self) -> OsString {
-        self.file_name.to_owned()
+        self.file_name.clone()
     }
 }
 
@@ -280,12 +304,12 @@ fn encode_path_wide(input: &RelativePath) -> io::Result<Vec<u16>> {
             Component::CurDir => {}
             Component::ParentDir => {
                 if path.is_empty() {
-                    return Err(io::Error::from_raw_os_error(ERROR_INVALID_PARAMETER as i32));
+                    return Err(io::Error::from_raw_os_error(EINVAL));
                 }
 
                 let index = path
                     .iter()
-                    .rposition(|window| *window == MAIN_SEPARATOR as u8 as u16)
+                    .rposition(|window| *window == MAIN_SEPARATOR_U16)
                     .unwrap_or(0);
 
                 path.truncate(index);
@@ -304,10 +328,6 @@ fn encode_path_wide(input: &RelativePath) -> io::Result<Vec<u16>> {
         path.extend_from_slice('.'.encode_utf16(&mut [0; 2]));
     }
 
-    if mem::size_of_val(&path[..]) > u16::MAX as usize {
-        return Err(io::Error::from_raw_os_error(ERROR_INVALID_PARAMETER as i32));
-    }
-
     Ok(path)
 }
 
@@ -315,6 +335,7 @@ unsafe impl Send for OpenOptions {}
 unsafe impl Sync for OpenOptions {}
 
 #[derive(Clone, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub(super) struct OpenOptions {
     // generic
     read: bool,
@@ -388,7 +409,7 @@ impl OpenOptions {
             (false, _, true, _) => c::FILE_GENERIC_WRITE & !c::FILE_WRITE_DATA,
             (true, _, true, _) => DEFAULT_READ | (c::FILE_GENERIC_WRITE & !c::FILE_WRITE_DATA),
             (false, false, false, _) => {
-                return Err(io::Error::from_raw_os_error(ERROR_INVALID_PARAMETER as i32));
+                return Err(io::Error::from_raw_os_error(EINVAL));
             }
         };
 
@@ -400,12 +421,12 @@ impl OpenOptions {
             (true, false) => {}
             (false, false) => {
                 if self.truncate || self.create || self.create_new {
-                    return Err(io::Error::from_raw_os_error(ERROR_INVALID_PARAMETER as i32));
+                    return Err(io::Error::from_raw_os_error(EINVAL));
                 }
             }
             (_, true) => {
                 if self.truncate && !self.create_new {
-                    return Err(io::Error::from_raw_os_error(ERROR_INVALID_PARAMETER as i32));
+                    return Err(io::Error::from_raw_os_error(EINVAL));
                 }
             }
         }
@@ -430,4 +451,16 @@ impl Metadata {
     pub(super) fn is_dir(&self) -> bool {
         self.attributes & c::FILE_ATTRIBUTE_DIRECTORY != 0
     }
+}
+
+fn unicode_string_ref(path: &[u16]) -> io::Result<UNICODE_STRING> {
+    let Ok(len) = u16::try_from(mem::size_of_val(path)) else {
+        return Err(io::Error::from_raw_os_error(EINVAL));
+    };
+
+    Ok(UNICODE_STRING {
+        Length: len,
+        MaximumLength: len,
+        Buffer: path.as_ptr().cast_mut(),
+    })
 }

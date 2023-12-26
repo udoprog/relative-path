@@ -34,6 +34,10 @@ impl Root {
     /// Open the given directory that can be used as a root for opening and
     /// manipulating relative paths.
     ///
+    /// # Errors
+    ///
+    /// Errors if the underlying I/O operation fails.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -81,6 +85,10 @@ impl Root {
     ///
     /// See also [`Root::write()`] for a simple function to create a file with a
     /// given data.
+    ///
+    /// # Errors
+    ///
+    /// Errors if the underlying I/O operation fails.
     ///
     /// # Examples
     ///

@@ -146,11 +146,11 @@ impl<'a> Matcher<'a> {
         queue.push_back(current.clone());
 
         while let Some(current) = queue.pop_front() {
-            if let Ok(m) = self.root.metadata(&current) {
-                if !m.is_dir() {
-                    continue;
-                }
-            } else {
+            let Ok(m) = self.root.metadata(&current) else {
+                continue;
+            };
+
+            if !m.is_dir() {
                 continue;
             }
 
@@ -307,14 +307,12 @@ impl<'a> Fragment<'a> {
                         // Peek the next literal component. If we have a
                         // trailing wildcard (which this constitutes) then it
                         // is by definition a match.
-                        let peek = match parts.get(1) {
-                            Some(Part::Literal(peek)) => peek,
-                            _ => return true,
+                        let Some(Part::Literal(peek)) = parts.get(1) else {
+                            return true;
                         };
 
-                        let peek = match peek.chars().next() {
-                            Some(peek) => peek,
-                            _ => return true,
+                        let Some(peek) = peek.chars().next() else {
+                            return true;
                         };
 
                         while let Some(c) = string.chars().next() {
@@ -332,9 +330,8 @@ impl<'a> Fragment<'a> {
                     Part::Literal(literal) => {
                         // The literal component must be an exact prefix of the
                         // current string.
-                        let remainder = match string.strip_prefix(literal) {
-                            Some(remainder) => remainder,
-                            None => return false,
+                        let Some(remainder) = string.strip_prefix(literal) else {
+                            return false;
                         };
 
                         string = remainder;

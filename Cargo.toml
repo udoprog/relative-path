@@ -14,8 +14,8 @@ keywords = ["path"]
 categories = ["filesystem"]
 
 [features]
-default = ["root"]
-root = ["dep:windows-sys", "dep:libc"]
+default = []
+root = ["dep:windows-sys", "dep:libc", "dep:errno"]
 
 [dependencies]
 serde = { version = "1.0.160", optional = true }
@@ -37,7 +37,7 @@ features = [
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.151", optional = true }
-errno = "0.3.8"
+errno = { version = "0.3.8", optional = true }
 
 [dev-dependencies]
 anyhow = "1.0.76"

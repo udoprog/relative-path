@@ -114,9 +114,9 @@ impl Root {
     ///
     /// See the [`OpenOptions::open`] method for more details.
     ///
-    /// If you only need to read the entire file contents,
-    /// consider [`std::fs::read()`][self::read] or
-    /// [`std::fs::read_to_string()`][self::read_to_string] instead.
+    /// If you only need to read the entire file contents, consider
+    /// [`std::fs::read()`][Root::read] or
+    /// [`std::fs::read_to_string()`][Root::read_to_string] instead.
     ///
     /// # Errors
     ///
@@ -797,8 +797,7 @@ pub struct Metadata {
 
 impl Metadata {
     /// Returns `true` if this metadata is for a directory. The result is
-    /// mutually exclusive to the result of [`Metadata::is_file`], and will be
-    /// false for symlink metadata obtained from [`symlink_metadata`].
+    /// mutually exclusive to the result of [`Metadata::is_file`].
     ///
     /// # Examples
     ///
@@ -815,5 +814,49 @@ impl Metadata {
     #[inline]
     pub fn is_dir(&self) -> bool {
         self.inner.is_dir()
+    }
+
+    /// Returns `true` if this metadata is for a regular file. The result is
+    /// mutually exclusive to the result of [`Metadata::is_dir`].
+    ///
+    /// When the goal is simply to read from (or write to) the source, the most
+    /// reliable way to test the source can be read (or written to) is to open
+    /// it. Only using `is_file` can break workflows like `diff <( prog_a )` on
+    /// a Unix-like system for example. See [`Root::open`] or
+    /// [`OpenOptions::open`] for more information.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use relative_path_utils::Root;
+    ///
+    /// let root = Root::new(".")?;
+    ///
+    /// let metadata = root.metadata("foo.txt")?;
+    /// assert!(metadata.is_file());
+    /// # Ok::<_, std::io::Error>(())
+    /// ```
+    #[must_use]
+    #[inline]
+    pub fn is_file(&self) -> bool {
+        self.inner.is_file()
+    }
+
+    /// Returns `true` if this metadata is for a symbolic link.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use relative_path_utils::Root;
+    ///
+    /// let root = Root::new(".")?;
+    ///
+    /// let metadata = root.metadata("foo.txt")?;
+    /// assert!(metadata.is_symlink());
+    /// # Ok::<_, std::io::Error>(())
+    /// ```
+    #[must_use]
+    pub fn is_symlink(&self) -> bool {
+        self.inner.is_symlink()
     }
 }

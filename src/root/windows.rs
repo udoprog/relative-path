@@ -1,11 +1,9 @@
 use std::ffi::OsString;
 use std::fs::File;
-use std::mem;
-use std::mem::size_of;
-use std::mem::MaybeUninit;
+use std::mem::{self, align_of, size_of, MaybeUninit};
 use std::os::windows::ffi::OsStringExt;
 use std::os::windows::fs::OpenOptionsExt;
-use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle};
+use std::os::windows::io::{AsHandle, AsRawHandle, FromRawHandle, OwnedHandle, RawHandle};
 use std::path::Path;
 use std::path::MAIN_SEPARATOR;
 use std::ptr;
@@ -109,8 +107,10 @@ impl Root {
     }
 
     pub(super) fn metadata(&self, path: &RelativePath) -> io::Result<Metadata> {
+        let owned;
+
         let handle = if is_current(path) {
-            self.handle.try_clone()?
+            self.handle.as_handle()
         } else {
             let mut opts = OpenOptions::new();
             opts.read(true);
@@ -118,7 +118,8 @@ impl Root {
             // No read or write permissions are necessary
             // opts.access_mode = Some(0);
             // opts.custom_create_options = nt::FILE_OPEN_FOR_BACKUP_INTENT;
-            self.open_at_inner(path, &opts)?
+            owned = self.open_at_inner(path, &opts)?;
+            owned.as_handle()
         };
 
         unsafe {
@@ -149,16 +150,18 @@ impl Root {
 
         Ok(ReadDir {
             handle,
-            buffer: [0; 1024],
+            buffer: Aligned([], [0; 1024]),
             at: None,
             first: true,
         })
     }
 }
 
+struct Aligned<T>([nt::FILE_NAMES_INFORMATION; 0], T);
+
 pub(super) struct ReadDir {
     handle: OwnedHandle,
-    buffer: [u8; 1024],
+    buffer: Aligned<[u8; 1024]>,
     first: bool,
     at: Option<usize>,
 }
@@ -170,8 +173,10 @@ impl Iterator for ReadDir {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             while let Some(at) = self.at.take() {
+                assert!(at % align_of::<nt::FILE_NAMES_INFORMATION>() == 0);
+
                 unsafe {
-                    let file_names = &*self.buffer[at..]
+                    let file_names = &*self.buffer.1[at..]
                         .as_ptr()
                         .cast::<nt::FILE_NAMES_INFORMATION>();
 
@@ -203,8 +208,8 @@ impl Iterator for ReadDir {
                     None,
                     ptr::null(),
                     &mut status_block,
-                    self.buffer.as_mut_ptr().cast(),
-                    self.buffer.len() as u32,
+                    self.buffer.1.as_mut_ptr().cast(),
+                    self.buffer.1.len() as u32,
                     12, // FileNamesInformation
                     if mem::take(&mut self.first) {
                         SL_RESTART_SCAN
@@ -268,39 +273,43 @@ fn is_current(path: &RelativePath) -> bool {
     path.components().all(|c| c == Component::CurDir)
 }
 
-fn encode_path_wide(path: &RelativePath) -> io::Result<Vec<u16>> {
-    let mut output = Vec::with_capacity(path.as_str().len() * 2);
+fn encode_path_wide(input: &RelativePath) -> io::Result<Vec<u16>> {
+    let mut path = Vec::with_capacity(input.as_str().len() * 2);
 
-    for c in path.components() {
+    for c in input.components() {
         match c {
             Component::CurDir => {}
             Component::ParentDir => {
-                if output.is_empty() {
+                if path.is_empty() {
                     return Err(io::Error::from_raw_os_error(ERROR_INVALID_PARAMETER as i32));
                 }
 
-                let index = output
+                let index = path
                     .iter()
                     .rposition(|window| *window == MAIN_SEPARATOR as u8 as u16)
                     .unwrap_or(0);
 
-                output.truncate(index);
+                path.truncate(index);
             }
             Component::Normal(normal) => {
-                if !output.is_empty() {
-                    output.extend_from_slice(MAIN_SEPARATOR.encode_utf16(&mut [0; 2]));
+                if !path.is_empty() {
+                    path.extend_from_slice(MAIN_SEPARATOR.encode_utf16(&mut [0; 2]));
                 }
 
-                output.extend(normal.encode_utf16());
+                path.extend(normal.encode_utf16());
             }
         }
     }
 
-    if output.is_empty() {
-        output.extend_from_slice('.'.encode_utf16(&mut [0; 2]));
+    if path.is_empty() {
+        path.extend_from_slice('.'.encode_utf16(&mut [0; 2]));
     }
 
-    Ok(output)
+    if mem::size_of_val(&path[..]) > u16::MAX as usize {
+        return Err(io::Error::from_raw_os_error(ERROR_INVALID_PARAMETER as i32));
+    }
+
+    Ok(path)
 }
 
 unsafe impl Send for OpenOptions {}

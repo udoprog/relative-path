@@ -76,7 +76,7 @@ fn glob() -> Result<()> {
     files(&[("glob/src/root/second", Some("second content"))]);
 
     let r1 = root("glob");
-    let glob = r1.glob("**/root/*")?;
+    let glob = r1.glob("**/root/*");
 
     let mut results = Vec::new();
 

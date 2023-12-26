@@ -69,7 +69,31 @@ impl Root {
         }
     }
 
-    /// Create the given file.
+    /// Opens a file in write-only mode.
+    ///
+    /// This function will create a file if it does not exist, and will truncate
+    /// it if it does.
+    ///
+    /// Depending on the platform, this function may fail if the full directory
+    /// path does not exist. See the [`OpenOptions::open`] function for more
+    /// details.
+    ///
+    /// See also [`Root::write()`] for a simple function to create a file with a
+    /// given data.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io::Write;
+    ///
+    /// use relative_path::Root;
+    ///
+    /// let root = Root::new(".")?;
+    ///
+    /// let mut f = root.create("foo.txt")?;
+    /// f.write_all(&1234_u32.to_be_bytes())?;
+    /// # Ok::<_, std::io::Error>(())
+    /// ```
     pub fn create<P>(&self, path: P) -> io::Result<File>
     where
         P: AsRef<RelativePath>,
@@ -77,7 +101,33 @@ impl Root {
         self.open_options().write(true).create(true).open(path)
     }
 
-    /// Open the given file for reading.
+    /// Attempts to open a file in read-only mode.
+    ///
+    /// See the [`OpenOptions::open`] method for more details.
+    ///
+    /// If you only need to read the entire file contents,
+    /// consider [`std::fs::read()`][self::read] or
+    /// [`std::fs::read_to_string()`][self::read_to_string] instead.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if `path` does not already exist.
+    /// Other errors may also be returned according to [`OpenOptions::open`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io::Read;
+    ///
+    /// use relative_path::Root;
+    ///
+    /// let root = Root::new(".")?;
+    ///
+    /// let mut f = root.open("foo.txt")?;
+    /// let mut data = vec![];
+    /// f.read_to_end(&mut data)?;
+    /// # Ok::<_, std::io::Error>(())
+    /// ```
     pub fn open<P>(&self, path: P) -> io::Result<File>
     where
         P: AsRef<RelativePath>,
@@ -98,7 +148,7 @@ impl Root {
     /// Other errors may also be returned according to [`OpenOptions::open`].
     ///
     /// While reading from the file, this function handles
-    /// [`io::ErrorKind::Interrupted`] with automatic retries. See [io::Read]
+    /// [`io::ErrorKind::Interrupted`] with automatic retries. See [`io::Read`]
     /// documentation for details.
     ///
     /// # Examples
@@ -118,7 +168,10 @@ impl Root {
     {
         fn inner(this: &Root, path: &RelativePath) -> io::Result<Vec<u8>> {
             let mut file = this.open(path)?;
-            let size = file.metadata().map(|m| m.len() as usize).ok();
+            let size = file
+                .metadata()
+                .map(|m| usize::try_from(m.len()).unwrap_or(usize::MAX))
+                .ok();
             let mut bytes = Vec::with_capacity(size.unwrap_or(0));
             file.read_to_end(&mut bytes)?;
             Ok(bytes)
@@ -143,10 +196,6 @@ impl Root {
     /// If the contents of the file are not valid UTF-8, then an error will also
     /// be returned.
     ///
-    /// While reading from the file, this function handles
-    /// [`io::ErrorKind::Interrupted`] with automatic retries. See [io::Read]
-    /// documentation for details.
-    ///
     /// # Examples
     ///
     /// ```no_run
@@ -164,7 +213,10 @@ impl Root {
     {
         fn inner(this: &Root, path: &RelativePath) -> io::Result<String> {
             let mut file = this.open(path)?;
-            let size = file.metadata().map(|m| m.len() as usize).ok();
+            let size = file
+                .metadata()
+                .map(|m| usize::try_from(m.len()).unwrap_or(usize::MAX))
+                .ok();
             let mut string = String::with_capacity(size.unwrap_or(0));
             file.read_to_string(&mut string)?;
             Ok(string)
@@ -185,6 +237,10 @@ impl Root {
     /// [`write_all`] with fewer imports.
     ///
     /// [`write_all`]: Write::write_all
+    ///
+    /// # Errors
+    ///
+    /// Fails if an underlying I/O operation fails.
     ///
     /// # Examples
     ///
@@ -245,12 +301,45 @@ impl Root {
         })
     }
 
+    /// Returns `true` if the path exists on disk and is pointing at a
+    /// directory.
+    ///
+    /// This function will traverse symbolic links to query information about
+    /// the destination file.
+    ///
+    /// If you cannot access the metadata of the file, e.g. because of a
+    /// permission error or broken symbolic links, this will return `false`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use relative_path::Root;
+    ///
+    /// let root = Root::new(".")?;
+    ///
+    /// assert_eq!(root.is_dir("./is_a_directory/"), true);
+    /// assert_eq!(root.is_dir("a_file.txt"), false);
+    /// # Ok::<_, std::io::Error>(())
+    /// ```
+    ///
+    /// # See Also
+    ///
+    /// This is a convenience function that coerces errors to false. If you want
+    /// to check errors, call [`Root::metadata`] and handle its [`Result`]. Then
+    /// call [`Metadata::is_dir`] if it was [`Ok`].
+    pub fn is_dir<P>(&self, path: P) -> bool
+    where
+        P: AsRef<RelativePath>,
+    {
+        self.metadata(path).map(|m| m.is_dir()).unwrap_or(false)
+    }
+
     /// Returns an iterator over the entries within a directory.
     ///
-    /// The iterator will yield instances of <code>[io::Result]<[DirEntry]></code>.
-    /// New errors may be encountered after an iterator is initially constructed.
-    /// Entries for the current and parent directories (typically `.` and `..`) are
-    /// skipped.
+    /// The iterator will yield instances of
+    /// <code>[`io::Result`]<[`DirEntry`]></code>. New errors may be encountered
+    /// after an iterator is initially constructed. Entries for the current and
+    /// parent directories (typically `.` and `..`) are skipped.
     ///
     /// # Platform-specific behavior
     ///
@@ -277,40 +366,24 @@ impl Root {
     ///
     /// ```
     /// use std::io;
-    /// use std::fs::{self, DirEntry};
-    /// use std::path::Path;
+    ///
+    /// use relative_path::{RelativePath, Root, DirEntry};
     ///
     /// // one possible implementation of walking a directory only visiting files
-    /// fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
-    ///     if dir.is_dir() {
-    ///         for entry in fs::read_dir(dir)? {
+    /// fn visit_dirs(root: &Root, dir: &RelativePath, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
+    ///     if root.is_dir(dir) {
+    ///         for entry in root.read_dir(dir)? {
     ///             let entry = entry?;
-    ///             let path = entry.path();
-    ///             if path.is_dir() {
-    ///                 visit_dirs(&path, cb)?;
+    ///             let file_name = entry.file_name();
+    ///             let path = dir.join(file_name.to_string_lossy().as_ref());
+    ///
+    ///             if root.is_dir(&path) {
+    ///                 visit_dirs(root, &path, cb)?;
     ///             } else {
     ///                 cb(&entry);
     ///             }
     ///         }
     ///     }
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// ```rust,no_run
-    /// use std::{fs, io};
-    ///
-    /// fn main() -> io::Result<()> {
-    ///     let mut entries = fs::read_dir(".")?
-    ///         .map(|res| res.map(|e| e.path()))
-    ///         .collect::<Result<Vec<_>, io::Error>>()?;
-    ///
-    ///     // The order in which `read_dir` returns entries is not guaranteed. If reproducible
-    ///     // ordering is required the entries should be explicitly sorted.
-    ///
-    ///     entries.sort();
-    ///
-    ///     // The entries have now been sorted by their path.
     ///
     ///     Ok(())
     /// }
@@ -335,7 +408,7 @@ impl Root {
     ///
     /// let root = Root::new("src")?;
     ///
-    /// let glob = root.glob("**/*.rs")?;
+    /// let glob = root.glob("**/*.rs");
     ///
     /// let mut results = Vec::new();
     ///
@@ -347,11 +420,11 @@ impl Root {
     /// assert_eq!(results, vec!["lib.rs", "main.rs"]);
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    pub fn glob<'a, P>(&'a self, path: &'a P) -> io::Result<Glob<'a>>
+    pub fn glob<'a, P>(&'a self, path: &'a P) -> Glob<'a>
     where
         P: ?Sized + AsRef<RelativePath>,
     {
-        Ok(Glob::new(self, path.as_ref()))
+        Glob::new(self, path.as_ref())
     }
 }
 
@@ -398,6 +471,7 @@ impl Root {
 /// # Ok::<_, std::io::Error>(())
 /// ```
 #[derive(Clone, Debug)]
+#[must_use]
 pub struct OpenOptions<'a> {
     root: &'a imp::Root,
     options: imp::OpenOptions,
@@ -467,8 +541,8 @@ impl<'a> OpenOptions<'a> {
     /// If a file is opened with both read and append access, beware that after
     /// opening, and after every write, the position for reading may be set at
     /// the end of the file. So, before writing, save the current position
-    /// (using <code>[seek]\([SeekFrom]::[Current]\(0))</code>), and restore it
-    /// before the next read.
+    /// (using <code>[`seek`]\([`SeekFrom`]::[`Current`]\(0))</code>), and
+    /// restore it before the next read.
     ///
     /// ## Note
     ///
@@ -477,9 +551,9 @@ impl<'a> OpenOptions<'a> {
     ///
     /// [`write()`]: Write::write "io::Write::write"
     /// [`flush()`]: Write::flush "io::Write::flush"
-    /// [seek]: std::io::Seek::seek "io::Seek::seek"
-    /// [SeekFrom]: std::io::SeekFrom
-    /// [Current]: std::io::SeekFrom::Current
+    /// [`seek`]: std::io::Seek::seek "io::Seek::seek"
+    /// [`SeekFrom`]: std::io::SeekFrom
+    /// [`Current`]: std::io::SeekFrom::Current
     ///
     /// # Examples
     ///
@@ -630,7 +704,7 @@ impl<'a> OpenOptions<'a> {
 /// Iterator over the entries in a directory.
 ///
 /// This iterator is returned from the [`Root::read_dir`] function and will
-/// yield instances of <code>[io::Result]<[DirEntry]></code>. Through a
+/// yield instances of <code>[`io::Result`]<[`DirEntry`]></code>. Through a
 /// [`DirEntry`] information like the entry's path and possibly other metadata
 /// can be learned.
 ///

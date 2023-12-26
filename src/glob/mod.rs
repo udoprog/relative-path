@@ -44,6 +44,7 @@ enum ErrorKind {
 }
 
 impl std::error::Error for Error {
+    #[allow(clippy::match_same_arms)]
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match &self.kind {
             ErrorKind::ReadDir(error) => Some(error),
@@ -76,7 +77,7 @@ impl<'a> Glob<'a> {
     ///
     /// let root = Root::new("src")?;
     ///
-    /// let glob = root.glob("**/*.rs")?;
+    /// let glob = root.glob("**/*.rs");
     ///
     /// let mut results = Vec::new();
     ///
@@ -140,7 +141,7 @@ impl<'a> Matcher<'a> {
         self.queue.push_back((current.clone(), rest));
 
         let mut queue = VecDeque::new();
-        queue.push_back(current.to_owned());
+        queue.push_back(current.clone());
 
         while let Some(current) = queue.pop_front() {
             if let Ok(m) = self.root.metadata(&current) {

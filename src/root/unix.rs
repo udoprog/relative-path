@@ -278,6 +278,7 @@ impl OpenOptions {
     }
 }
 
+#[derive(Clone)]
 pub(super) struct Metadata {
     stat: libc::stat64,
 }

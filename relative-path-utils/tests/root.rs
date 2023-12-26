@@ -13,7 +13,7 @@ fn make_path(path: &'static str) -> PathBuf {
 fn root(path: &'static str) -> Root {
     match Root::new(make_path(path)) {
         Ok(root) => root,
-        Err(error) => panic!("Failed to open root: {}: {}", path, error),
+        Err(error) => panic!("Failed to open root: {path}: {error}"),
     }
 }
 

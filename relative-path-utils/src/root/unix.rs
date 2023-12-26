@@ -274,7 +274,7 @@ pub(crate) struct DirEntry {
 
 impl DirEntry {
     pub(crate) fn file_name(&self) -> OsString {
-        self.file_name.to_owned()
+        self.file_name.clone()
     }
 }
 
@@ -296,6 +296,7 @@ unsafe impl Send for OpenOptions {}
 unsafe impl Sync for OpenOptions {}
 
 #[derive(Clone, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub(super) struct OpenOptions {
     // generic
     read: bool,

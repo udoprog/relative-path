@@ -60,7 +60,7 @@ impl Root {
             let object_name = unicode_string_ref(&path)?;
 
             let attributes = OBJECT_ATTRIBUTES {
-                Length: size_of::<OBJECT_ATTRIBUTES>() as u32,
+                Length: len_of::<OBJECT_ATTRIBUTES>(),
                 RootDirectory: self.handle.as_raw_handle() as HANDLE,
                 ObjectName: &object_name,
                 Attributes: 0,
@@ -92,9 +92,7 @@ impl Root {
             );
 
             if status != STATUS_SUCCESS {
-                return Err(io::Error::from_raw_os_error(
-                    RtlNtStatusToDosError(status) as i32
-                ));
+                return Err(nt_error(status));
             }
 
             Ok(OwnedHandle::from_raw_handle(
@@ -247,9 +245,7 @@ impl Iterator for ReadDir {
                 }
 
                 if status != STATUS_SUCCESS {
-                    return Some(Err(io::Error::from_raw_os_error(
-                        RtlNtStatusToDosError(status) as i32,
-                    )));
+                    return Some(Err(nt_error(status)));
                 }
 
                 self.at = Some(0);
@@ -451,6 +447,16 @@ impl Metadata {
     pub(super) fn is_dir(&self) -> bool {
         self.attributes & c::FILE_ATTRIBUTE_DIRECTORY != 0
     }
+}
+
+#[allow(clippy::cast_possible_truncation)]
+unsafe fn len_of<T>() -> u32 {
+    size_of::<T>() as u32
+}
+
+#[allow(clippy::cast_possible_wrap)]
+fn nt_error(status: i32) -> io::Error {
+    io::Error::from_raw_os_error(unsafe { RtlNtStatusToDosError(status) } as i32)
 }
 
 fn unicode_string_ref(path: &[u16]) -> io::Result<UNICODE_STRING> {

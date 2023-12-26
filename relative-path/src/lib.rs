@@ -1789,6 +1789,16 @@ impl RelativePath {
     }
 }
 
+impl<'a> IntoIterator for &'a RelativePath {
+    type IntoIter = Iter<'a>;
+    type Item = &'a str;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 /// Conversion from a [`Box<str>`] reference to a [`Box<RelativePath>`].
 ///
 /// # Examples

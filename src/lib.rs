@@ -294,6 +294,7 @@ pub use self::root::{DirEntry, OpenOptions, ReadDir, Root};
 #[cfg(feature = "root")]
 mod root;
 
+#[cfg(feature = "root")]
 pub use self::glob::Glob;
 #[cfg(feature = "root")]
 mod glob;

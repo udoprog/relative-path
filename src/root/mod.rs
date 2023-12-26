@@ -327,6 +327,26 @@ impl Root {
     /// Parse a glob over the specified path.
     ///
     /// To perform the globbing, use [`Glob::matcher`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use relative_path::Root;
+    ///
+    /// let root = Root::new("src")?;
+    ///
+    /// let glob = root.glob("**/*.rs")?;
+    ///
+    /// let mut results = Vec::new();
+    ///
+    /// for e in glob.matcher() {
+    ///     results.push(e?);
+    /// }
+    ///
+    /// results.sort();
+    /// assert_eq!(results, vec!["lib.rs", "main.rs"]);
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
     pub fn glob<'a, P>(&'a self, path: &'a P) -> io::Result<Glob<'a>>
     where
         P: ?Sized + AsRef<RelativePath>,

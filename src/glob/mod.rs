@@ -53,6 +53,8 @@ impl std::error::Error for Error {
 }
 
 /// A compiled glob expression.
+///
+/// This is returned by [`Root::glob`].
 pub struct Glob<'a> {
     root: &'a Root,
     components: Vec<Component<'a>>,
@@ -66,6 +68,26 @@ impl<'a> Glob<'a> {
     }
 
     /// Construct a new matcher over the compiled glob pattern.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use relative_path::Root;
+    ///
+    /// let root = Root::new("src")?;
+    ///
+    /// let glob = root.glob("**/*.rs")?;
+    ///
+    /// let mut results = Vec::new();
+    ///
+    /// for e in glob.matcher() {
+    ///     results.push(e?);
+    /// }
+    ///
+    /// results.sort();
+    /// assert_eq!(results, vec!["lib.rs", "main.rs"]);
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
     #[must_use]
     pub fn matcher(&self) -> Matcher<'_> {
         Matcher {

@@ -1,6 +1,6 @@
 [package]
 name = "relative-path-utils"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.66"
@@ -17,7 +17,7 @@ categories = ["filesystem"]
 root = ["dep:windows-sys", "dep:libc", "dep:errno"]
 
 [dependencies]
-relative-path = { path = "../relative-path", version = "1.9.1" }
+relative-path = { path = "../relative-path", version = "1.9.2" }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.52.0"

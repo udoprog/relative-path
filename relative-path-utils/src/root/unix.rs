@@ -23,7 +23,7 @@ use libc::{fstat as fstat64, stat as stat64};
 ))]
 use libc::{fstat64, stat64};
 
-use crate::{Component, RelativePath};
+use relative_path::{Component, RelativePath};
 
 #[derive(Debug)]
 pub(super) struct Root {

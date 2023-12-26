@@ -17,6 +17,9 @@
 //! On top of this we support many operations that guarantee the same behavior
 //! across platforms.
 //!
+//! For more utilities to manipulate relative paths, see the
+//! [`relative-path-utils` crate].
+//!
 //! <br>
 //!
 //! ## Usage
@@ -24,7 +27,7 @@
 //! Add `relative-path` to your `Cargo.toml`:
 //!
 //! ```toml
-//! relative-path = "1.9.0"
+//! relative-path = "1.9.1"
 //! ```
 //!
 //! Start using relative paths:
@@ -279,6 +282,7 @@
 //! [`to_path`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path
 //! [windows-reserved]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
 //! [windows-case]: https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity
+//! [`relative-path-utils` crate]: https://docs.rs/relative-path-utils
 
 // This file contains parts that are Copyright 2015 The Rust Project Developers, copied from:
 // https://github.com/rust-lang/rust
@@ -288,17 +292,6 @@
 #![deny(missing_docs)]
 
 mod path_ext;
-
-#[cfg(feature = "root")]
-#[doc(inline)]
-pub use self::root::{DirEntry, OpenOptions, ReadDir, Root};
-#[cfg(feature = "root")]
-mod root;
-
-#[cfg(feature = "root")]
-pub use self::glob::Glob;
-#[cfg(feature = "root")]
-mod glob;
 
 #[cfg(test)]
 mod tests;
@@ -1018,7 +1011,7 @@ pub struct RelativePath {
 
 /// An error returned from [`strip_prefix`] if the prefix was not found.
 ///
-/// [strip_prefix]: RelativePath::strip_prefix
+/// [`strip_prefix`]: RelativePath::strip_prefix
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StripPrefixError(());
 

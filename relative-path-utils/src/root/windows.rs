@@ -20,8 +20,7 @@ use windows_sys::Win32::Foundation::{
 use windows_sys::Win32::Storage::FileSystem as c;
 use windows_sys::Win32::System::IO::IO_STATUS_BLOCK;
 
-use crate::Component;
-use crate::RelativePath;
+use relative_path::{Component, RelativePath};
 
 #[derive(Debug)]
 pub(super) struct Root {

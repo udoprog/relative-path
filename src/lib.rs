@@ -402,7 +402,7 @@ impl<'a> Component<'a> {
     /// assert_eq!(&components, &[".", "tmp", "..", "foo", "bar.txt"]);
     /// ```
     pub fn as_str(self) -> &'a str {
-        use self::Component::{CurDir, ParentDir, Normal};
+        use self::Component::{CurDir, Normal, ParentDir};
 
         match self {
             CurDir => CURRENT_STR,
@@ -451,7 +451,7 @@ fn relative_traversal<'a, C>(buf: &mut RelativePathBuf, components: C)
 where
     C: IntoIterator<Item = Component<'a>>,
 {
-    use self::Component::{CurDir, ParentDir, Normal};
+    use self::Component::{CurDir, Normal, ParentDir};
 
     for c in components {
         match c {
@@ -676,7 +676,7 @@ impl RelativePathBuf {
     /// );
     /// ```
     pub fn from_path<P: AsRef<path::Path>>(path: P) -> Result<RelativePathBuf, FromPathError> {
-        use std::path::Component::{Prefix, RootDir, CurDir, ParentDir, Normal};
+        use std::path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
 
         let mut buffer = RelativePathBuf::new();
 
@@ -1034,7 +1034,7 @@ impl RelativePath {
     pub fn from_path<P: ?Sized + AsRef<path::Path>>(
         path: &P,
     ) -> Result<&RelativePath, FromPathError> {
-        use std::path::Component::{Prefix, RootDir, CurDir, ParentDir, Normal};
+        use std::path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
 
         let other = path.as_ref();
 
@@ -1368,7 +1368,7 @@ impl RelativePath {
     /// ```
     #[must_use]
     pub fn file_name(&self) -> Option<&str> {
-        use self::Component::{CurDir, ParentDir, Normal};
+        use self::Component::{CurDir, Normal, ParentDir};
 
         let mut it = self.components();
 
@@ -1485,7 +1485,7 @@ impl RelativePath {
     /// See [`set_file_name`] for more details.
     ///
     /// [`set_file_name`]: RelativePathBuf::set_file_name
-    /// 
+    ///
     /// # Examples
     ///
     /// ```

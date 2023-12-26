@@ -1,5 +1,5 @@
 use std::ffi::OsString;
-use std::fs::{File, Metadata};
+use std::fs::File;
 use std::mem;
 use std::mem::size_of;
 use std::mem::MaybeUninit;
@@ -14,10 +14,10 @@ use std::{io, slice};
 use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
 use windows_sys::Wdk::Storage::FileSystem as nt;
 use windows_sys::Wdk::System::SystemServices::SL_RESTART_SCAN;
-use windows_sys::Win32::Foundation::STATUS_SUCCESS;
+use windows_sys::Win32::Foundation::FALSE;
 use windows_sys::Win32::Foundation::{
     RtlNtStatusToDosError, ERROR_INVALID_PARAMETER, HANDLE, STATUS_NO_MORE_FILES, STATUS_PENDING,
-    UNICODE_STRING,
+    STATUS_SUCCESS, UNICODE_STRING,
 };
 use windows_sys::Win32::Storage::FileSystem as c;
 use windows_sys::Win32::System::IO::IO_STATUS_BLOCK;
@@ -43,11 +43,11 @@ impl Root {
     }
 
     pub(super) fn open_at(&self, path: &RelativePath, options: &OpenOptions) -> io::Result<File> {
-        let handle = self.open_inner(path, options)?;
+        let handle = self.open_at_inner(path, options)?;
         Ok(File::from(handle))
     }
 
-    pub(super) fn open_inner(
+    pub(super) fn open_at_inner(
         &self,
         path: &RelativePath,
         options: &OpenOptions,
@@ -109,20 +109,43 @@ impl Root {
     }
 
     pub(super) fn metadata(&self, path: &RelativePath) -> io::Result<Metadata> {
-        let mut opts = OpenOptions::new();
-        opts.read(true);
-        opts.access_mode = Some(c::FILE_READ_ATTRIBUTES);
-        // No read or write permissions are necessary
-        // opts.access_mode = Some(0);
-        // opts.custom_create_options = nt::FILE_OPEN_FOR_BACKUP_INTENT;
-        let file = self.open_at(path, &opts)?;
-        file.metadata()
+        let handle = if is_current(path) {
+            self.handle.try_clone()?
+        } else {
+            let mut opts = OpenOptions::new();
+            opts.read(true);
+            opts.access_mode = Some(c::FILE_READ_ATTRIBUTES);
+            // No read or write permissions are necessary
+            // opts.access_mode = Some(0);
+            // opts.custom_create_options = nt::FILE_OPEN_FOR_BACKUP_INTENT;
+            self.open_at_inner(path, &opts)?
+        };
+
+        unsafe {
+            let mut info = MaybeUninit::zeroed();
+
+            if c::GetFileInformationByHandle(handle.as_raw_handle() as isize, info.as_mut_ptr())
+                == FALSE
+            {
+                return Err(io::Error::last_os_error());
+            }
+
+            let info = info.assume_init();
+
+            Ok(Metadata {
+                attributes: info.dwFileAttributes,
+            })
+        }
     }
 
     pub(super) fn read_dir(&self, path: &RelativePath) -> io::Result<ReadDir> {
-        let mut opts = OpenOptions::new();
-        opts.access_mode = Some(c::SYNCHRONIZE | c::FILE_LIST_DIRECTORY);
-        let handle = self.open_inner(path, &opts)?;
+        let handle = if is_current(path) {
+            self.handle.try_clone()?
+        } else {
+            let mut opts = OpenOptions::new();
+            opts.access_mode = Some(c::SYNCHRONIZE | c::FILE_LIST_DIRECTORY);
+            self.open_at_inner(path, &opts)?
+        };
 
         Ok(ReadDir {
             handle,
@@ -239,6 +262,10 @@ impl Drop for FindNextFileHandle {
         let r = unsafe { c::FindClose(self.0) };
         debug_assert!(r != 0);
     }
+}
+
+fn is_current(path: &RelativePath) -> bool {
+    path.components().all(|c| c == Component::CurDir)
 }
 
 fn encode_path_wide(path: &RelativePath) -> io::Result<Vec<u16>> {
@@ -382,5 +409,17 @@ impl OpenOptions {
             (true, true, false) => nt::FILE_OVERWRITE_IF,
             (_, _, true) => nt::FILE_CREATE,
         })
+    }
+}
+
+#[derive(Clone)]
+pub(super) struct Metadata {
+    attributes: u32,
+}
+
+impl Metadata {
+    #[inline]
+    pub(super) fn is_dir(&self) -> bool {
+        self.attributes & c::FILE_ATTRIBUTE_DIRECTORY != 0
     }
 }

@@ -35,9 +35,9 @@ features = [
     "Win32_System_Kernel",
 ]
 
-[target.'cfg(unix)'.dependencies.libc]
-version = "0.2.151"
-optional = true
+[target.'cfg(unix)'.dependencies]
+libc = { version = "0.2.151", optional = true }
+errno = "0.3.8"
 
 [dev-dependencies]
 anyhow = "1.0.76"

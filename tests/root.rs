@@ -41,10 +41,10 @@ fn files(list: &[(&'static str, Option<&'static str>)]) {
 fn relative_open() -> Result<()> {
     files(&[("relative_open/src/root/first", Some("first content"))]);
 
-    let r1 = root("src/root");
+    let r1 = root("relative_open/src/root");
     assert_eq!(r1.read_to_string("first")?, "first content");
 
-    let r2 = root("src");
+    let r2 = root("relative_open/src");
     assert_eq!(r2.read_to_string("root/first")?, "first content");
     Ok(())
 }

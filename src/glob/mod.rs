@@ -24,7 +24,6 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
-            ErrorKind::Metadata(..) => write!(f, "Error getting file metadata"),
             ErrorKind::ReadDir(..) => write!(f, "Error reading directory"),
             ErrorKind::DirEntry(..) => write!(f, "Error getting directory entry"),
         }
@@ -40,7 +39,6 @@ impl From<ErrorKind> for Error {
 
 #[derive(Debug)]
 enum ErrorKind {
-    Metadata(io::Error),
     ReadDir(io::Error),
     DirEntry(io::Error),
 }
@@ -48,7 +46,6 @@ enum ErrorKind {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match &self.kind {
-            ErrorKind::Metadata(error) => Some(error),
             ErrorKind::ReadDir(error) => Some(error),
             ErrorKind::DirEntry(error) => Some(error),
         }
@@ -84,23 +81,19 @@ impl<'a> Matcher<'a> {
     /// Perform an expansion in the filesystem.
     fn expand_filesystem<M>(
         &mut self,
-        current: &RelativePathBuf,
+        current: &RelativePath,
         rest: &'a [Component<'a>],
         mut m: M,
     ) -> Result<()>
     where
         M: FnMut(&str) -> bool,
     {
-        match self.root.metadata(current) {
-            Ok(m) => {
-                if !m.is_dir() {
-                    return Ok(());
-                }
-            }
-            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+        if let Ok(m) = self.root.metadata(current) {
+            if !m.is_dir() {
                 return Ok(());
             }
-            Err(e) => return Err(Error::new(ErrorKind::Metadata(e))),
+        } else {
+            return Ok(());
         }
 
         for e in self.root.read_dir(current).map_err(ErrorKind::ReadDir)? {
@@ -112,7 +105,7 @@ impl<'a> Matcher<'a> {
                 continue;
             }
 
-            let mut new = current.clone();
+            let mut new = current.to_owned();
             new.push(c.as_ref());
             self.queue.push_back((new, rest));
         }
@@ -128,16 +121,12 @@ impl<'a> Matcher<'a> {
         queue.push_back(current.to_owned());
 
         while let Some(current) = queue.pop_front() {
-            match self.root.metadata(&current) {
-                Ok(m) => {
-                    if !m.is_dir() {
-                        return Ok(());
-                    }
-                }
-                Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            if let Ok(m) = self.root.metadata(&current) {
+                if !m.is_dir() {
                     continue;
                 }
-                Err(e) => return Err(Error::new(ErrorKind::Metadata(e))),
+            } else {
+                continue;
             }
 
             for e in self.root.read_dir(&current).map_err(ErrorKind::ReadDir)? {
@@ -293,12 +282,14 @@ impl<'a> Fragment<'a> {
                         // Peek the next literal component. If we have a
                         // trailing wildcard (which this constitutes) then it
                         // is by definition a match.
-                        let Some(Part::Literal(peek)) = parts.get(1) else {
-                            return true;
+                        let peek = match parts.get(1) {
+                            Some(Part::Literal(peek)) => peek,
+                            _ => return true,
                         };
 
-                        let Some(peek) = peek.chars().next() else {
-                            return true;
+                        let peek = match peek.chars().next() {
+                            Some(peek) => peek,
+                            _ => return true,
                         };
 
                         while let Some(c) = string.chars().next() {
@@ -316,8 +307,9 @@ impl<'a> Fragment<'a> {
                     Part::Literal(literal) => {
                         // The literal component must be an exact prefix of the
                         // current string.
-                        let Some(remainder) = string.strip_prefix(literal) else {
-                            return false;
+                        let remainder = match string.strip_prefix(literal) {
+                            Some(remainder) => remainder,
+                            None => return false,
                         };
 
                         string = remainder;

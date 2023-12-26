@@ -3,7 +3,7 @@
 // See https://github.com/rust-lang/rust
 
 use std::ffi::OsString;
-use std::fs::{File, Metadata};
+use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
 
@@ -240,7 +240,9 @@ impl Root {
     where
         P: AsRef<RelativePath>,
     {
-        self.inner.metadata(path.as_ref())
+        Ok(Metadata {
+            inner: self.inner.metadata(path.as_ref())?,
+        })
     }
 
     /// Returns an iterator over the entries within a directory.
@@ -674,5 +676,40 @@ impl DirEntry {
     #[must_use]
     pub fn file_name(&self) -> OsString {
         self.inner.file_name()
+    }
+}
+
+/// Metadata information about a file.
+///
+/// This structure is returned from the [`metadata`] function and represents
+/// known metadata about a file such as its permissions, size, modification
+/// times, etc.
+///
+/// [`metadata`]: Root::metadata
+#[derive(Clone)]
+pub struct Metadata {
+    inner: imp::Metadata,
+}
+
+impl Metadata {
+    /// Returns `true` if this metadata is for a directory. The result is
+    /// mutually exclusive to the result of [`Metadata::is_file`], and will be
+    /// false for symlink metadata obtained from [`symlink_metadata`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use relative_path::Root;
+    ///
+    /// let root = Root::new(".")?;
+    ///
+    /// let metadata = root.metadata("foo.txt")?;
+    /// assert!(!metadata.is_dir());
+    /// # Ok::<_, std::io::Error>(())
+    /// ```
+    #[must_use]
+    #[inline]
+    pub fn is_dir(&self) -> bool {
+        self.inner.is_dir()
     }
 }

@@ -280,11 +280,6 @@ impl Iterator for ReadDir {
     }
 }
 
-struct FindNextFileHandle(HANDLE);
-
-unsafe impl Send for FindNextFileHandle {}
-unsafe impl Sync for FindNextFileHandle {}
-
 pub(super) struct DirEntry {
     file_name: OsString,
 }
@@ -304,13 +299,6 @@ impl DirEntry {
 
     pub(super) fn file_name(&self) -> OsString {
         self.file_name.clone()
-    }
-}
-
-impl Drop for FindNextFileHandle {
-    fn drop(&mut self) {
-        let r = unsafe { c::FindClose(self.0) };
-        debug_assert!(r != 0);
     }
 }
 

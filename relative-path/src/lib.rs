@@ -702,16 +702,20 @@ impl RelativePathBuf {
 
     /// Extends `self` with `path`.
     ///
-    /// If `path` is absolute, it replaces the current path.
-    ///
     /// # Examples
     ///
     /// ```
-    /// use relative_path::{RelativePathBuf, RelativePath};
+    /// use relative_path::RelativePathBuf;
     ///
     /// let mut path = RelativePathBuf::new();
     /// path.push("foo");
     /// path.push("bar");
+    ///
+    /// assert_eq!("foo/bar", path);
+    ///
+    /// let mut path = RelativePathBuf::new();
+    /// path.push("foo");
+    /// path.push("/bar");
     ///
     /// assert_eq!("foo/bar", path);
     /// ```

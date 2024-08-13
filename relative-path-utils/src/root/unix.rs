@@ -2,9 +2,9 @@ use std::ffi::{CString, OsString};
 use std::fs::File;
 use std::io;
 use std::mem::MaybeUninit;
-use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
 use std::os::fd::{AsFd, AsRawFd};
+use std::os::fd::{FromRawFd, IntoRawFd};
 use std::path::{Path, MAIN_SEPARATOR};
 
 #[cfg(not(any(
@@ -96,12 +96,14 @@ impl Root {
                 return Err(io::Error::last_os_error());
             }
 
+            // fdopendir() takes ownership of the file descriptor, and it will
+            // be closed when the `Dir` handle is dropped.
+            _ = fd.into_raw_fd();
             Dir { handle }
         };
 
         Ok(ReadDir {
             dir,
-            _fd: fd,
             end_of_stream: false,
         })
     }
@@ -109,7 +111,6 @@ impl Root {
 
 pub(super) struct ReadDir {
     dir: Dir,
-    _fd: OwnedFd,
     end_of_stream: bool,
 }
 

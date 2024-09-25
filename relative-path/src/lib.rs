@@ -1926,7 +1926,7 @@ impl From<RelativePathBuf> for Arc<RelativePath> {
     }
 }
 
-/// Conversion from [`RelativePathBuf`] to [`Arc<RelativePath>`].
+/// Conversion from [`RelativePathBuf`] to [`Rc<RelativePath>`].
 ///
 /// # Examples
 ///

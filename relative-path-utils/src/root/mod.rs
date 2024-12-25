@@ -487,7 +487,7 @@ pub struct OpenOptions<'a> {
     options: imp::OpenOptions,
 }
 
-impl<'a> OpenOptions<'a> {
+impl OpenOptions<'_> {
     /// Sets the option for read access.
     ///
     /// This option, when true, will indicate that the file should be

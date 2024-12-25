@@ -497,7 +497,7 @@ impl<'a> Iterator for Components<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for Components<'a> {
+impl DoubleEndedIterator for Components<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.source = self.source.trim_end_matches(SEP);
 
@@ -2113,14 +2113,14 @@ pub struct Display<'a> {
     path: &'a RelativePath,
 }
 
-impl<'a> fmt::Debug for Display<'a> {
+impl fmt::Debug for Display<'_> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&self.path, f)
     }
 }
 
-impl<'a> fmt::Display for Display<'a> {
+impl fmt::Display for Display<'_> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.path, f)
@@ -2168,7 +2168,7 @@ impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
     {
         struct Visitor;
 
-        impl<'de> serde::de::Visitor<'de> for Visitor {
+        impl serde::de::Visitor<'_> for Visitor {
             type Value = RelativePathBuf;
 
             #[inline]
@@ -2216,7 +2216,7 @@ impl<'de> serde::de::Deserialize<'de> for Box<RelativePath> {
     {
         struct Visitor;
 
-        impl<'de> serde::de::Visitor<'de> for Visitor {
+        impl serde::de::Visitor<'_> for Visitor {
             type Value = Box<RelativePath>;
 
             #[inline]

@@ -13,25 +13,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  msrv:
+    runs-on: ${{matrix.os}}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@1.66
+    - run: cargo build --workspace
+    - run: cargo build --workspace --all-features
+    - run: cargo build --workspace --no-default-features
+
   test:
     runs-on: ${{matrix.os}}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        toolchain: ["1.66", stable]
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{matrix.toolchain}}
-    - run: cargo build --workspace
-    - run: cargo build --workspace --all-features
-    - run: cargo build --workspace --no-default-features
-    - run: cargo test --workspace --doc --all-features
-      if: matrix.toolchain == 'stable'
+    - uses: dtolnay/rust-toolchain@stable
     - run: cargo test --workspace --all-targets --all-features
-      if: matrix.toolchain == 'stable'
+    - run: cargo test --workspace --doc --all-features
 
   clippy:
     runs-on: ubuntu-latest

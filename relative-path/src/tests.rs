@@ -2,9 +2,13 @@
 
 use super::*;
 
+use std::format;
 use std::path::Path;
 use std::rc::Rc;
+use std::string::ToString;
 use std::sync::Arc;
+use std::vec;
+use std::vec::Vec;
 
 macro_rules! t(
     ($path:expr, iter: $iter:expr) => (

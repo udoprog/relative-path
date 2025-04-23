@@ -13,9 +13,10 @@
 // https://github.com/Manishearth/pathdiff/blob/master/src/lib.rs
 // https://github.com/rust-lang/rust/blob/e1d0de82cc40b666b88d4a6d2c9dcbc81d7ed27f/src/librustc_back/rpath.rs#L116-L158
 
+use core::fmt;
 use std::error;
-use std::fmt;
 use std::path::{Path, PathBuf};
+use std::prelude::v1::*;
 
 use crate::{Component, RelativePathBuf};
 

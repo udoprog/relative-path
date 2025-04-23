@@ -33,6 +33,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
     - run: cargo test --workspace --all-targets --all-features
     - run: cargo test --workspace --doc --all-features
 
@@ -49,6 +50,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@1.66
       with:
         components: clippy
+    - uses: Swatinem/rust-cache@v2
     - run: cargo check -p relative-path --no-default-features --features "${{matrix.feature}}"
     - run: cargo clippy -p relative-path --no-default-features --features "${{matrix.feature}}"
 
@@ -59,6 +61,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy
+    - uses: Swatinem/rust-cache@v2
     - run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
   rustfmt:

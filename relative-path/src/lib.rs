@@ -290,12 +290,15 @@
 
 #![allow(clippy::manual_let_else)]
 #![deny(missing_docs)]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 
-#[cfg(not(feature = "std"))]
 extern crate alloc;
+
 #[cfg(feature = "std")]
-extern crate std as alloc;
+extern crate std;
+
+#[cfg(feature = "std")]
+use std::prelude::v1::*;
 
 #[cfg(feature = "std")]
 mod path_ext;
@@ -587,8 +590,8 @@ impl<'a> DoubleEndedIterator for Iter<'a> {
     }
 }
 
-#[cfg(feature = "std")]
 /// Error kind for [`FromPathError`].
+#[cfg(feature = "std")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FromPathErrorKind {
@@ -600,9 +603,9 @@ pub enum FromPathErrorKind {
     BadSeparator,
 }
 
-#[cfg(feature = "std")]
 /// An error raised when attempting to convert a path using
 /// [`RelativePathBuf::from_path`].
+#[cfg(feature = "std")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FromPathError {
     kind: FromPathErrorKind,
@@ -677,7 +680,6 @@ impl RelativePathBuf {
         }
     }
 
-    #[cfg(feature = "std")]
     /// Try to convert a [`Path`] to a [`RelativePathBuf`].
     ///
     /// [`Path`]: https://doc.rust-lang.org/std/path/struct.Path.html
@@ -701,6 +703,7 @@ impl RelativePathBuf {
     ///
     /// [`Prefix`]: std::path::Component::Prefix
     /// [`RootDir`]: std::path::Component::RootDir
+    #[cfg(feature = "std")]
     pub fn from_path<P: AsRef<path::Path>>(path: P) -> Result<RelativePathBuf, FromPathError> {
         use std::path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
 
@@ -1043,7 +1046,6 @@ impl RelativePath {
         unsafe { &*(s.as_ref() as *const str as *const RelativePath) }
     }
 
-    #[cfg(feature = "std")]
     /// Try to convert a [`Path`] to a [`RelativePath`] without allocating a buffer.
     ///
     /// [`Path`]: std::path::Path
@@ -1075,6 +1077,7 @@ impl RelativePath {
     ///     assert_eq!(FromPathErrorKind::NonRelative, e.kind());
     /// }
     /// ```
+    #[cfg(feature = "std")]
     pub fn from_path<P: ?Sized + AsRef<path::Path>>(
         path: &P,
     ) -> Result<&RelativePath, FromPathError> {
@@ -1205,7 +1208,6 @@ impl RelativePath {
         RelativePathBuf::from(self.inner.to_owned())
     }
 
-    #[cfg(feature = "std")]
     /// Build an owned [`PathBuf`] relative to `base` for the current relative
     /// path.
     ///
@@ -1253,6 +1255,7 @@ impl RelativePath {
     ///
     /// [`PathBuf`]: std::path::PathBuf
     /// [`PathBuf::push`]: std::path::PathBuf::push
+    #[cfg(feature = "std")]
     pub fn to_path<P: AsRef<path::Path>>(&self, base: P) -> path::PathBuf {
         let mut p = base.as_ref().to_path_buf().into_os_string();
 
@@ -1267,7 +1270,6 @@ impl RelativePath {
         path::PathBuf::from(p)
     }
 
-    #[cfg(feature = "std")]
     /// Build an owned [`PathBuf`] relative to `base` for the current relative
     /// path.
     ///
@@ -1345,6 +1347,7 @@ impl RelativePath {
     ///
     /// [`PathBuf`]: std::path::PathBuf
     /// [`PathBuf::push`]: std::path::PathBuf::push
+    #[cfg(feature = "std")]
     pub fn to_logical_path<P: AsRef<path::Path>>(&self, base: P) -> path::PathBuf {
         use self::Component::{CurDir, Normal, ParentDir};
 

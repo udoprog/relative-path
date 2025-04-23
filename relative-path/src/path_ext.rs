@@ -16,6 +16,7 @@
 use core::error;
 use core::fmt;
 use std::path::{Path, PathBuf};
+use std::prelude::v1::*;
 
 use crate::{Component, RelativePathBuf};
 

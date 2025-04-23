@@ -35,6 +35,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
+    - run: cargo test -p relative-path --no-default-features --tests
     - run: cargo test --workspace --all-targets --all-features
     - run: cargo test --workspace --doc --all-features
 

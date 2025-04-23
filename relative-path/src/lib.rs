@@ -290,26 +290,37 @@
 
 #![allow(clippy::manual_let_else)]
 #![deny(missing_docs)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std as alloc;
+
+#[cfg(feature = "std")]
 mod path_ext;
 
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "std")]
 pub use path_ext::{PathExt, RelativeToError};
 
-use std::borrow::{Borrow, Cow};
-use std::cmp;
-use std::error;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::iter::FromIterator;
-use std::mem;
-use std::ops;
-use std::path;
-use std::rc::Rc;
-use std::str;
-use std::sync::Arc;
+use alloc::borrow::{Borrow, Cow, ToOwned};
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+use alloc::string::String;
+use alloc::sync::Arc;
+use core::cmp;
+use core::fmt;
+use core::hash::{Hash, Hasher};
+use core::iter::FromIterator;
+use core::mem;
+use core::ops;
+use core::str;
+
+#[cfg(feature = "std")]
+use std::{error, path};
 
 const STEM_SEP: char = '.';
 const CURRENT_STR: &str = ".";
@@ -576,6 +587,7 @@ impl<'a> DoubleEndedIterator for Iter<'a> {
     }
 }
 
+#[cfg(feature = "std")]
 /// Error kind for [`FromPathError`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -588,6 +600,7 @@ pub enum FromPathErrorKind {
     BadSeparator,
 }
 
+#[cfg(feature = "std")]
 /// An error raised when attempting to convert a path using
 /// [`RelativePathBuf::from_path`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -595,6 +608,7 @@ pub struct FromPathError {
     kind: FromPathErrorKind,
 }
 
+#[cfg(feature = "std")]
 impl FromPathError {
     /// Gets the underlying [`FromPathErrorKind`] that provides more details on
     /// what went wrong.
@@ -616,12 +630,14 @@ impl FromPathError {
     }
 }
 
+#[cfg(feature = "std")]
 impl From<FromPathErrorKind> for FromPathError {
     fn from(value: FromPathErrorKind) -> Self {
         Self { kind: value }
     }
 }
 
+#[cfg(feature = "std")]
 impl fmt::Display for FromPathError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self.kind {
@@ -634,6 +650,7 @@ impl fmt::Display for FromPathError {
     }
 }
 
+#[cfg(feature = "std")]
 impl error::Error for FromPathError {}
 
 /// An owned, mutable relative path.
@@ -660,6 +677,7 @@ impl RelativePathBuf {
         }
     }
 
+    #[cfg(feature = "std")]
     /// Try to convert a [`Path`] to a [`RelativePathBuf`].
     ///
     /// [`Path`]: https://doc.rust-lang.org/std/path/struct.Path.html
@@ -1025,6 +1043,7 @@ impl RelativePath {
         unsafe { &*(s.as_ref() as *const str as *const RelativePath) }
     }
 
+    #[cfg(feature = "std")]
     /// Try to convert a [`Path`] to a [`RelativePath`] without allocating a buffer.
     ///
     /// [`Path`]: std::path::Path
@@ -1186,6 +1205,7 @@ impl RelativePath {
         RelativePathBuf::from(self.inner.to_owned())
     }
 
+    #[cfg(feature = "std")]
     /// Build an owned [`PathBuf`] relative to `base` for the current relative
     /// path.
     ///
@@ -1247,6 +1267,7 @@ impl RelativePath {
         path::PathBuf::from(p)
     }
 
+    #[cfg(feature = "std")]
     /// Build an owned [`PathBuf`] relative to `base` for the current relative
     /// path.
     ///

@@ -14,13 +14,16 @@ keywords = ["path"]
 categories = ["filesystem"]
 
 [features]
-default = []
+default = ["std"]
+std = []
+serde = ["dep:serde" ]
 
 [dependencies]
-serde = { version = "1.0.160", optional = true }
+serde = { version = "1.0.160", optional = true, default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
 anyhow = "1.0.76"
+foldhash = "0.1.5"
 serde = { version = "1.0.160", features = ["derive"] }
 
 [package.metadata.docs.rs]

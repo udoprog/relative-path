@@ -16,11 +16,8 @@ categories = ["filesystem"]
 [features]
 root = ["dep:windows-sys", "dep:libc", "dep:errno"]
 
-[dependencies.relative-path]
-path = "../relative-path"
-version = "1.9.2"
-default-features = false
-features = ["alloc"]
+[dependencies]
+relative-path = { path = "../relative-path", version = "1.9.2", default-features = false, features = ["alloc"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.52.0"

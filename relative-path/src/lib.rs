@@ -299,9 +299,6 @@ extern crate alloc;
 extern crate std;
 
 #[cfg(feature = "std")]
-use std::prelude::v1::*;
-
-#[cfg(feature = "std")]
 mod path_ext;
 
 #[cfg(test)]
@@ -309,6 +306,16 @@ mod tests;
 
 #[cfg(feature = "std")]
 pub use path_ext::{PathExt, RelativeToError};
+
+use core::cmp;
+use core::fmt;
+use core::hash::{Hash, Hasher};
+#[cfg(feature = "alloc")]
+use core::iter::FromIterator;
+use core::mem;
+#[cfg(feature = "alloc")]
+use core::ops;
+use core::str;
 
 #[cfg(feature = "alloc")]
 use alloc::borrow::{Borrow, Cow, ToOwned};
@@ -320,18 +327,11 @@ use alloc::rc::Rc;
 use alloc::string::String;
 #[cfg(feature = "alloc")]
 use alloc::sync::Arc;
-use core::cmp;
-use core::fmt;
-use core::hash::{Hash, Hasher};
-#[cfg(feature = "alloc")]
-use core::iter::FromIterator;
-use core::mem;
-#[cfg(feature = "alloc")]
-use core::ops;
-use core::str;
 
 #[cfg(feature = "std")]
-use std::{error, path};
+use std::error;
+#[cfg(feature = "std")]
+use std::path;
 
 const STEM_SEP: char = '.';
 const CURRENT_STR: &str = ".";
@@ -1921,7 +1921,7 @@ where
 /// let path: Box<RelativePath> = path.into();
 /// assert_eq!(&*path, "foo/bar");
 /// ```
-#[cfg(feature = "alloc")] 
+#[cfg(feature = "alloc")]
 impl From<RelativePathBuf> for Box<RelativePath> {
     #[inline]
     fn from(path: RelativePathBuf) -> Box<RelativePath> {

@@ -1840,15 +1840,15 @@ impl RelativePath {
     }
 
     /// Check if path starts with a path separator.
-    #[allow(dead_code)]
     #[inline]
+    #[cfg(feature = "alloc")]
     fn starts_with_sep(&self) -> bool {
         self.inner.starts_with(SEP)
     }
 
     /// Check if path ends with a path separator.
-    #[allow(dead_code)]
     #[inline]
+    #[cfg(feature = "alloc")]
     fn ends_with_sep(&self) -> bool {
         self.inner.ends_with(SEP)
     }

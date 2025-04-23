@@ -22,14 +22,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@1.66
-    - run: cargo build --workspace
     - run: cargo build --workspace --all-features
-    - run: cargo build --workspace --no-default-features
-    - run: cargo build -p relative-path --no-default-features
-    - run: cargo build -p relative-path --no-default-features --features=serde
-    - run: cargo build -p relative-path --no-default-features --features=alloc
-    - run: cargo build -p relative-path --no-default-features --features=serde,alloc
-    - run: cargo build -p relative-path-utils --no-default-features
 
   test:
     runs-on: ${{matrix.os}}
@@ -42,6 +35,17 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
     - run: cargo test --workspace --all-targets --all-features
     - run: cargo test --workspace --doc --all-features
+
+  build_features:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        feature: ["", serde, alloc, "serde,alloc"]
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@1.66
+    - run: cargo build -p relative-path --no-default-features --features "${{matrix.feature}}"
 
   clippy:
     runs-on: ubuntu-latest

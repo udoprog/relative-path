@@ -36,16 +36,19 @@ jobs:
     - run: cargo test --workspace --all-targets --all-features
     - run: cargo test --workspace --doc --all-features
 
-  build_features:
+  build_feature:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        feature: ["", serde, alloc, "serde,alloc"]
+        feature: ["", serde, alloc, "serde,alloc", std, "alloc,std"]
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@1.66
-    - run: cargo build -p relative-path --no-default-features --features "${{matrix.feature}}"
+      with:
+        components: clippy
+    - run: cargo check -p relative-path --no-default-features --features "${{matrix.feature}}"
+    - run: cargo clippy -p relative-path --no-default-features --features "${{matrix.feature}}"
 
   clippy:
     runs-on: ubuntu-latest

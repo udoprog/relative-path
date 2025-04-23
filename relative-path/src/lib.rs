@@ -288,7 +288,6 @@
 // https://github.com/rust-lang/rust
 // cb2a656cdfb6400ac0200c661267f91fabf237e2 src/libstd/path.rs
 
-#![allow(clippy::manual_let_else)]
 #![deny(missing_docs)]
 #![no_std]
 

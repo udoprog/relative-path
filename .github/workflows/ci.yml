@@ -25,6 +25,11 @@ jobs:
     - run: cargo build --workspace
     - run: cargo build --workspace --all-features
     - run: cargo build --workspace --no-default-features
+    - run: cargo build -p relative-path --no-default-features
+    - run: cargo build -p relative-path --no-default-features --features=serde
+    - run: cargo build -p relative-path --no-default-features --features=alloc
+    - run: cargo build -p relative-path --no-default-features --features=serde,alloc
+    - run: cargo build -p relative-path-utils --no-default-features
 
   test:
     runs-on: ${{matrix.os}}

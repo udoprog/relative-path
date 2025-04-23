@@ -6,6 +6,7 @@ use std::path::Path;
 use std::prelude::v1::*;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::{format, vec};
 
 macro_rules! t(
     ($path:expr, iter: $iter:expr) => (

@@ -290,6 +290,7 @@
 
 #![deny(missing_docs)]
 #![no_std]
+#![cfg_attr(relative_path_docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -297,27 +298,34 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "alloc", feature = "std"))]
 mod path_ext;
 
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "alloc", feature = "std"))]
+#[cfg_attr(
+    relative_path_docsrs,
+    doc(cfg(all(feature = "alloc", feature = "std")))
+)]
 pub use path_ext::{PathExt, RelativeToError};
+
+#[cfg(feature = "alloc")]
+#[cfg_attr(relative_path_docsrs, doc(cfg(feature = "alloc")))]
+mod relative_path_buf;
+#[cfg(feature = "alloc")]
+#[doc(inline)]
+pub use self::relative_path_buf::RelativePathBuf;
 
 use core::cmp;
 use core::fmt;
 use core::hash::{Hash, Hasher};
-#[cfg(feature = "alloc")]
-use core::iter::FromIterator;
 use core::mem;
-#[cfg(feature = "alloc")]
-use core::ops;
 use core::str;
 
 #[cfg(feature = "alloc")]
-use alloc::borrow::{Borrow, Cow, ToOwned};
+use alloc::borrow::{Cow, ToOwned};
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
@@ -338,6 +346,7 @@ const PARENT_STR: &str = "..";
 
 const SEP: char = '/';
 
+#[inline(always)]
 fn split_file_at_dot(input: &str) -> (Option<&str>, Option<&str>) {
     if input == PARENT_STR {
         return (Some(input), None);
@@ -358,6 +367,7 @@ fn split_file_at_dot(input: &str) -> (Option<&str>, Option<&str>) {
 // Iterate through `iter` while it matches `prefix`; return `None` if `prefix`
 // is not a prefix of `iter`, otherwise return `Some(iter_after_prefix)` giving
 // `iter` after having exhausted `prefix`.
+#[inline(always)]
 fn iter_after<'a, 'b, I, J>(mut iter: I, mut prefix: J) -> Option<I>
 where
     I: Iterator<Item = Component<'a>> + Clone,
@@ -418,6 +428,7 @@ impl<'a> Component<'a> {
     /// assert_eq!(&components, &[".", "tmp", "..", "foo", "bar.txt"]);
     /// ```
     #[must_use]
+    #[inline]
     pub fn as_str(self) -> &'a str {
         use self::Component::{CurDir, Normal, ParentDir};
 
@@ -456,36 +467,6 @@ impl AsRef<RelativePath> for Component<'_> {
     #[inline]
     fn as_ref(&self) -> &RelativePath {
         self.as_str().as_ref()
-    }
-}
-
-/// Traverse the given components and apply to the provided stack.
-///
-/// This takes '.', and '..' into account. Where '.' doesn't change the stack, and '..' pops the
-/// last item or further adds parent components.
-#[cfg(feature = "alloc")]
-#[inline(always)]
-fn relative_traversal<'a, C>(buf: &mut RelativePathBuf, components: C)
-where
-    C: IntoIterator<Item = Component<'a>>,
-{
-    use self::Component::{CurDir, Normal, ParentDir};
-
-    for c in components {
-        match c {
-            CurDir => (),
-            ParentDir => match buf.components().next_back() {
-                Some(Component::ParentDir) | None => {
-                    buf.push(PARENT_STR);
-                }
-                _ => {
-                    buf.pop();
-                }
-            },
-            Normal(name) => {
-                buf.push(name);
-            }
-        }
     }
 }
 
@@ -543,6 +524,7 @@ impl DoubleEndedIterator for Components<'_> {
 
 impl<'a> Components<'a> {
     /// Construct a new component from the given string.
+    #[inline]
     fn new(source: &'a str) -> Components<'a> {
         Self { source }
     }
@@ -568,6 +550,7 @@ impl<'a> Components<'a> {
 }
 
 impl<'a> cmp::PartialEq for Components<'a> {
+    #[inline]
     fn eq(&self, other: &Components<'a>) -> bool {
         Iterator::eq(self.clone(), other.clone())
     }
@@ -587,12 +570,14 @@ pub struct Iter<'a> {
 impl<'a> Iterator for Iter<'a> {
     type Item = &'a str;
 
+    #[inline]
     fn next(&mut self) -> Option<&'a str> {
         self.inner.next().map(Component::as_str)
     }
 }
 
 impl<'a> DoubleEndedIterator for Iter<'a> {
+    #[inline]
     fn next_back(&mut self) -> Option<&'a str> {
         self.inner.next_back().map(Component::as_str)
     }
@@ -600,6 +585,7 @@ impl<'a> DoubleEndedIterator for Iter<'a> {
 
 /// Error kind for [`FromPathError`].
 #[cfg(feature = "std")]
+#[cfg_attr(relative_path_docsrs, doc(cfg(feature = "std")))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FromPathErrorKind {
@@ -614,12 +600,14 @@ pub enum FromPathErrorKind {
 /// An error raised when attempting to convert a path using
 /// [`RelativePathBuf::from_path`].
 #[cfg(feature = "std")]
+#[cfg_attr(relative_path_docsrs, doc(cfg(feature = "std")))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FromPathError {
     kind: FromPathErrorKind,
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(relative_path_docsrs, doc(cfg(feature = "std")))]
 impl FromPathError {
     /// Gets the underlying [`FromPathErrorKind`] that provides more details on
     /// what went wrong.
@@ -636,19 +624,23 @@ impl FromPathError {
     /// assert_eq!(FromPathErrorKind::NonRelative, e.kind());
     /// ```
     #[must_use]
+    #[inline]
     pub fn kind(&self) -> FromPathErrorKind {
         self.kind
     }
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(relative_path_docsrs, doc(cfg(feature = "std")))]
 impl From<FromPathErrorKind> for FromPathError {
+    #[inline]
     fn from(value: FromPathErrorKind) -> Self {
         Self { kind: value }
     }
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(relative_path_docsrs, doc(cfg(feature = "std")))]
 impl fmt::Display for FromPathError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self.kind {
@@ -662,398 +654,8 @@ impl fmt::Display for FromPathError {
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(relative_path_docsrs, doc(cfg(feature = "std")))]
 impl error::Error for FromPathError {}
-
-/// An owned, mutable relative path.
-///
-/// This type provides methods to manipulate relative path objects.
-#[cfg(feature = "alloc")]
-#[derive(Clone)]
-pub struct RelativePathBuf {
-    inner: String,
-}
-
-#[cfg(feature = "alloc")]
-impl RelativePathBuf {
-    /// Create a new relative path buffer.
-    #[must_use]
-    pub fn new() -> RelativePathBuf {
-        RelativePathBuf {
-            inner: String::new(),
-        }
-    }
-
-    /// Internal constructor to allocate a relative path buf with the given capacity.
-    fn with_capacity(cap: usize) -> RelativePathBuf {
-        RelativePathBuf {
-            inner: String::with_capacity(cap),
-        }
-    }
-
-    /// Try to convert a [`Path`] to a [`RelativePathBuf`].
-    ///
-    /// [`Path`]: https://doc.rust-lang.org/std/path/struct.Path.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use relative_path::{RelativePath, RelativePathBuf, FromPathErrorKind};
-    /// use std::path::Path;
-    ///
-    /// assert_eq!(
-    ///     Ok(RelativePath::new("foo/bar").to_owned()),
-    ///     RelativePathBuf::from_path(Path::new("foo/bar"))
-    /// );
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// This will error in case the provided path is not a relative path, which
-    /// is identifier by it having a [`Prefix`] or [`RootDir`] component.
-    ///
-    /// [`Prefix`]: std::path::Component::Prefix
-    /// [`RootDir`]: std::path::Component::RootDir
-    #[cfg(feature = "std")]
-    pub fn from_path<P: AsRef<path::Path>>(path: P) -> Result<RelativePathBuf, FromPathError> {
-        use std::path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
-
-        let mut buffer = RelativePathBuf::new();
-
-        for c in path.as_ref().components() {
-            match c {
-                Prefix(_) | RootDir => return Err(FromPathErrorKind::NonRelative.into()),
-                CurDir => continue,
-                ParentDir => buffer.push(PARENT_STR),
-                Normal(s) => buffer.push(s.to_str().ok_or(FromPathErrorKind::NonUtf8)?),
-            }
-        }
-
-        Ok(buffer)
-    }
-
-    /// Extends `self` with `path`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use relative_path::RelativePathBuf;
-    ///
-    /// let mut path = RelativePathBuf::new();
-    /// path.push("foo");
-    /// path.push("bar");
-    ///
-    /// assert_eq!("foo/bar", path);
-    ///
-    /// let mut path = RelativePathBuf::new();
-    /// path.push("foo");
-    /// path.push("/bar");
-    ///
-    /// assert_eq!("foo/bar", path);
-    /// ```
-    pub fn push<P>(&mut self, path: P)
-    where
-        P: AsRef<RelativePath>,
-    {
-        let other = path.as_ref();
-
-        let other = if other.starts_with_sep() {
-            &other.inner[1..]
-        } else {
-            &other.inner[..]
-        };
-
-        if !self.inner.is_empty() && !self.ends_with_sep() {
-            self.inner.push(SEP);
-        }
-
-        self.inner.push_str(other);
-    }
-
-    /// Updates [`file_name`] to `file_name`.
-    ///
-    /// If [`file_name`] was [`None`], this is equivalent to pushing
-    /// `file_name`.
-    ///
-    /// Otherwise it is equivalent to calling [`pop`] and then pushing
-    /// `file_name`. The new path will be a sibling of the original path. (That
-    /// is, it will have the same parent.)
-    ///
-    /// [`file_name`]: RelativePath::file_name
-    /// [`pop`]: RelativePathBuf::pop
-    /// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use relative_path::RelativePathBuf;
-    ///
-    /// let mut buf = RelativePathBuf::from("");
-    /// assert!(buf.file_name() == None);
-    /// buf.set_file_name("bar");
-    /// assert_eq!(RelativePathBuf::from("bar"), buf);
-    ///
-    /// assert!(buf.file_name().is_some());
-    /// buf.set_file_name("baz.txt");
-    /// assert_eq!(RelativePathBuf::from("baz.txt"), buf);
-    ///
-    /// buf.push("bar");
-    /// assert!(buf.file_name().is_some());
-    /// buf.set_file_name("bar.txt");
-    /// assert_eq!(RelativePathBuf::from("baz.txt/bar.txt"), buf);
-    /// ```
-    pub fn set_file_name<S: AsRef<str>>(&mut self, file_name: S) {
-        if self.file_name().is_some() {
-            let popped = self.pop();
-            debug_assert!(popped);
-        }
-
-        self.push(file_name.as_ref());
-    }
-
-    /// Updates [`extension`] to `extension`.
-    ///
-    /// Returns `false` and does nothing if
-    /// [`file_name`][RelativePath::file_name] is [`None`], returns `true` and
-    /// updates the extension otherwise.
-    ///
-    /// If [`extension`] is [`None`], the extension is added; otherwise it is
-    /// replaced.
-    ///
-    /// [`extension`]: RelativePath::extension
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use relative_path::{RelativePath, RelativePathBuf};
-    ///
-    /// let mut p = RelativePathBuf::from("feel/the");
-    ///
-    /// p.set_extension("force");
-    /// assert_eq!(RelativePath::new("feel/the.force"), p);
-    ///
-    /// p.set_extension("dark_side");
-    /// assert_eq!(RelativePath::new("feel/the.dark_side"), p);
-    ///
-    /// assert!(p.pop());
-    /// p.set_extension("nothing");
-    /// assert_eq!(RelativePath::new("feel.nothing"), p);
-    /// ```
-    pub fn set_extension<S: AsRef<str>>(&mut self, extension: S) -> bool {
-        let file_stem = match self.file_stem() {
-            Some(stem) => stem,
-            None => return false,
-        };
-
-        let end_file_stem = file_stem[file_stem.len()..].as_ptr() as usize;
-        let start = self.inner.as_ptr() as usize;
-        self.inner.truncate(end_file_stem.wrapping_sub(start));
-
-        let extension = extension.as_ref();
-
-        if !extension.is_empty() {
-            self.inner.push(STEM_SEP);
-            self.inner.push_str(extension);
-        }
-
-        true
-    }
-
-    /// Truncates `self` to [`parent`][RelativePath::parent].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use relative_path::{RelativePath, RelativePathBuf};
-    ///
-    /// let mut p = RelativePathBuf::from("test/test.rs");
-    ///
-    /// assert_eq!(true, p.pop());
-    /// assert_eq!(RelativePath::new("test"), p);
-    /// assert_eq!(true, p.pop());
-    /// assert_eq!(RelativePath::new(""), p);
-    /// assert_eq!(false, p.pop());
-    /// assert_eq!(RelativePath::new(""), p);
-    /// ```
-    pub fn pop(&mut self) -> bool {
-        match self.parent().map(|p| p.inner.len()) {
-            Some(len) => {
-                self.inner.truncate(len);
-                true
-            }
-            None => false,
-        }
-    }
-
-    /// Coerce to a [`RelativePath`] slice.
-    #[must_use]
-    pub fn as_relative_path(&self) -> &RelativePath {
-        self
-    }
-
-    /// Consumes the `RelativePathBuf`, yielding its internal [`String`] storage.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use relative_path::RelativePathBuf;
-    ///
-    /// let p = RelativePathBuf::from("/the/head");
-    /// let string = p.into_string();
-    /// assert_eq!(string, "/the/head".to_owned());
-    /// ```
-    #[must_use]
-    pub fn into_string(self) -> String {
-        self.inner
-    }
-
-    /// Converts this `RelativePathBuf` into a [boxed][alloc::boxed::Box]
-    /// [`RelativePath`].
-    #[must_use]
-    pub fn into_boxed_relative_path(self) -> Box<RelativePath> {
-        let rw = Box::into_raw(self.inner.into_boxed_str()) as *mut RelativePath;
-        unsafe { Box::from_raw(rw) }
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl Default for RelativePathBuf {
-    fn default() -> Self {
-        RelativePathBuf::new()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a> From<&'a RelativePath> for Cow<'a, RelativePath> {
-    #[inline]
-    fn from(s: &'a RelativePath) -> Cow<'a, RelativePath> {
-        Cow::Borrowed(s)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a> From<RelativePathBuf> for Cow<'a, RelativePath> {
-    #[inline]
-    fn from(s: RelativePathBuf) -> Cow<'a, RelativePath> {
-        Cow::Owned(s)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl fmt::Debug for RelativePathBuf {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{:?}", &self.inner)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl AsRef<RelativePath> for RelativePathBuf {
-    fn as_ref(&self) -> &RelativePath {
-        RelativePath::new(&self.inner)
-    }
-}
-
-impl AsRef<str> for RelativePath {
-    fn as_ref(&self) -> &str {
-        &self.inner
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl Borrow<RelativePath> for RelativePathBuf {
-    #[inline]
-    fn borrow(&self) -> &RelativePath {
-        self
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, T: ?Sized + AsRef<str>> From<&'a T> for RelativePathBuf {
-    fn from(path: &'a T) -> RelativePathBuf {
-        RelativePathBuf {
-            inner: path.as_ref().to_owned(),
-        }
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl From<String> for RelativePathBuf {
-    fn from(path: String) -> RelativePathBuf {
-        RelativePathBuf { inner: path }
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl From<RelativePathBuf> for String {
-    fn from(path: RelativePathBuf) -> String {
-        path.into_string()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl ops::Deref for RelativePathBuf {
-    type Target = RelativePath;
-
-    fn deref(&self) -> &RelativePath {
-        RelativePath::new(&self.inner)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl cmp::PartialEq for RelativePathBuf {
-    fn eq(&self, other: &RelativePathBuf) -> bool {
-        self.components() == other.components()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl cmp::Eq for RelativePathBuf {}
-
-#[cfg(feature = "alloc")]
-impl cmp::PartialOrd for RelativePathBuf {
-    #[inline]
-    fn partial_cmp(&self, other: &RelativePathBuf) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl cmp::Ord for RelativePathBuf {
-    #[inline]
-    fn cmp(&self, other: &RelativePathBuf) -> cmp::Ordering {
-        self.components().cmp(other.components())
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl Hash for RelativePathBuf {
-    fn hash<H: Hasher>(&self, h: &mut H) {
-        self.as_relative_path().hash(h);
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<P> Extend<P> for RelativePathBuf
-where
-    P: AsRef<RelativePath>,
-{
-    #[inline]
-    fn extend<I: IntoIterator<Item = P>>(&mut self, iter: I) {
-        iter.into_iter().for_each(move |p| self.push(p.as_ref()));
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<P> FromIterator<P> for RelativePathBuf
-where
-    P: AsRef<RelativePath>,
-{
-    #[inline]
-    fn from_iter<I: IntoIterator<Item = P>>(iter: I) -> RelativePathBuf {
-        let mut buf = RelativePathBuf::new();
-        buf.extend(iter);
-        buf
-    }
-}
 
 /// A borrowed, immutable relative path.
 #[repr(transparent)]
@@ -1069,7 +671,11 @@ pub struct StripPrefixError(());
 
 impl RelativePath {
     /// Directly wraps a string slice as a `RelativePath` slice.
-    pub fn new<S: AsRef<str> + ?Sized>(s: &S) -> &RelativePath {
+    #[inline]
+    pub fn new<S>(s: &S) -> &RelativePath
+    where
+        S: AsRef<str> + ?Sized,
+    {
         unsafe { &*(s.as_ref() as *const str as *const RelativePath) }
     }
 
@@ -1105,9 +711,11 @@ impl RelativePath {
     /// }
     /// ```
     #[cfg(feature = "std")]
-    pub fn from_path<P: ?Sized + AsRef<path::Path>>(
-        path: &P,
-    ) -> Result<&RelativePath, FromPathError> {
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "std")))]
+    pub fn from_path<P>(path: &P) -> Result<&RelativePath, FromPathError>
+    where
+        P: ?Sized + AsRef<path::Path>,
+    {
         use std::path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
 
         let other = path.as_ref();
@@ -1144,6 +752,7 @@ impl RelativePath {
     /// assert_eq!(RelativePath::new("foo.txt").as_str(), "foo.txt");
     /// ```
     #[must_use]
+    #[inline]
     pub fn as_str(&self) -> &str {
         &self.inner
     }
@@ -1161,6 +770,8 @@ impl RelativePath {
     /// ```
     #[deprecated(note = "RelativePath implements std::fmt::Display directly")]
     #[must_use]
+    #[inline]
+    #[allow(deprecated)]
     pub fn display(&self) -> Display {
         Display { path: self }
     }
@@ -1176,6 +787,8 @@ impl RelativePath {
     /// assert_eq!("foo/bar/baz", path.join("baz"));
     /// ```
     #[cfg(feature = "alloc")]
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "alloc")))]
+    #[inline]
     pub fn join<P>(&self, path: P) -> RelativePathBuf
     where
         P: AsRef<RelativePath>,
@@ -1201,6 +814,7 @@ impl RelativePath {
     /// assert_eq!(None, it.next());
     /// ```
     #[must_use]
+    #[inline]
     pub fn components(&self) -> Components {
         Components::new(&self.inner)
     }
@@ -1224,6 +838,7 @@ impl RelativePath {
     /// assert_eq!(it.next(), None)
     /// ```
     #[must_use]
+    #[inline]
     pub fn iter(&self) -> Iter {
         Iter {
             inner: self.components(),
@@ -1233,6 +848,7 @@ impl RelativePath {
     /// Convert to an owned [`RelativePathBuf`].
     #[cfg(feature = "alloc")]
     #[must_use]
+    #[inline]
     pub fn to_relative_path_buf(&self) -> RelativePathBuf {
         RelativePathBuf::from(self.inner.to_owned())
     }
@@ -1285,7 +901,12 @@ impl RelativePath {
     /// [`PathBuf`]: std::path::PathBuf
     /// [`PathBuf::push`]: std::path::PathBuf::push
     #[cfg(feature = "std")]
-    pub fn to_path<P: AsRef<path::Path>>(&self, base: P) -> path::PathBuf {
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "std")))]
+    #[must_use]
+    pub fn to_path<P>(&self, base: P) -> path::PathBuf
+    where
+        P: AsRef<path::Path>,
+    {
         let mut p = base.as_ref().to_path_buf().into_os_string();
 
         for c in self.components() {
@@ -1377,7 +998,12 @@ impl RelativePath {
     /// [`PathBuf`]: std::path::PathBuf
     /// [`PathBuf::push`]: std::path::PathBuf::push
     #[cfg(feature = "std")]
-    pub fn to_logical_path<P: AsRef<path::Path>>(&self, base: P) -> path::PathBuf {
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "std")))]
+    #[must_use]
+    pub fn to_logical_path<P>(&self, base: P) -> path::PathBuf
+    where
+        P: AsRef<path::Path>,
+    {
         use self::Component::{CurDir, Normal, ParentDir};
 
         let mut p = base.as_ref().to_path_buf().into_os_string();
@@ -1508,6 +1134,7 @@ impl RelativePath {
     ///
     /// assert!(!path.starts_with("e"));
     /// ```
+    #[must_use]
     pub fn starts_with<P>(&self, base: P) -> bool
     where
         P: AsRef<RelativePath>,
@@ -1528,6 +1155,7 @@ impl RelativePath {
     ///
     /// assert!(path.ends_with("passwd"));
     /// ```
+    #[must_use]
     pub fn ends_with<P>(&self, child: P) -> bool
     where
         P: AsRef<RelativePath>,
@@ -1585,7 +1213,12 @@ impl RelativePath {
     /// assert_eq!(path.with_file_name("var"), RelativePathBuf::from("var"));
     /// ```
     #[cfg(feature = "alloc")]
-    pub fn with_file_name<S: AsRef<str>>(&self, file_name: S) -> RelativePathBuf {
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "alloc")))]
+    #[must_use]
+    pub fn with_file_name<S>(&self, file_name: S) -> RelativePathBuf
+    where
+        S: AsRef<str>,
+    {
         let mut buf = self.to_relative_path_buf();
         buf.set_file_name(file_name);
         buf
@@ -1609,6 +1242,7 @@ impl RelativePath {
     ///
     /// assert_eq!("foo", path.file_stem().unwrap());
     /// ```
+    #[must_use]
     pub fn file_stem(&self) -> Option<&str> {
         self.file_name()
             .map(split_file_at_dot)
@@ -1633,6 +1267,7 @@ impl RelativePath {
     /// assert_eq!(None, RelativePath::new(".rs").extension());
     /// assert_eq!(Some("rs"), RelativePath::new("foo.rs/.").extension());
     /// ```
+    #[must_use]
     pub fn extension(&self) -> Option<&str> {
         self.file_name()
             .map(split_file_at_dot)
@@ -1655,7 +1290,12 @@ impl RelativePath {
     /// assert_eq!(path.with_extension("txt"), RelativePathBuf::from("foo.txt"));
     /// ```
     #[cfg(feature = "alloc")]
-    pub fn with_extension<S: AsRef<str>>(&self, extension: S) -> RelativePathBuf {
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "alloc")))]
+    #[must_use]
+    pub fn with_extension<S>(&self, extension: S) -> RelativePathBuf
+    where
+        S: AsRef<str>,
+    {
         let mut buf = self.to_relative_path_buf();
         buf.set_extension(extension);
         buf
@@ -1680,13 +1320,15 @@ impl RelativePath {
     /// );
     /// ```
     #[cfg(feature = "alloc")]
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "alloc")))]
+    #[must_use]
     pub fn join_normalized<P>(&self, path: P) -> RelativePathBuf
     where
         P: AsRef<RelativePath>,
     {
         let mut buf = RelativePathBuf::new();
-        relative_traversal(&mut buf, self.components());
-        relative_traversal(&mut buf, path.as_ref().components());
+        self::relative_path_buf::relative_traversal(&mut buf, self.components());
+        self::relative_path_buf::relative_traversal(&mut buf, path.as_ref().components());
         buf
     }
 
@@ -1722,10 +1364,11 @@ impl RelativePath {
     /// );
     /// ```
     #[cfg(feature = "alloc")]
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "alloc")))]
     #[must_use]
     pub fn normalize(&self) -> RelativePathBuf {
         let mut buf = RelativePathBuf::with_capacity(self.inner.len());
-        relative_traversal(&mut buf, self.components());
+        self::relative_path_buf::relative_traversal(&mut buf, self.components());
         buf
     }
 
@@ -1792,6 +1435,8 @@ impl RelativePath {
     /// assert_eq!("", b.relative(a));
     /// ```
     #[cfg(feature = "alloc")]
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "alloc")))]
+    #[must_use]
     pub fn relative<P>(&self, path: P) -> RelativePathBuf
     where
         P: AsRef<RelativePath>,
@@ -1799,8 +1444,8 @@ impl RelativePath {
         let mut from = RelativePathBuf::with_capacity(self.inner.len());
         let mut to = RelativePathBuf::with_capacity(path.as_ref().inner.len());
 
-        relative_traversal(&mut from, self.components());
-        relative_traversal(&mut to, path.as_ref().components());
+        self::relative_path_buf::relative_traversal(&mut from, self.components());
+        self::relative_path_buf::relative_traversal(&mut to, path.as_ref().components());
 
         let mut it_from = from.components();
         let mut it_to = to.components();
@@ -1829,7 +1474,7 @@ impl RelativePath {
         let head = lead_from.into_iter().chain(it_from);
         let tail = lead_to.into_iter().chain(it_to);
 
-        let mut buf = RelativePathBuf::with_capacity(usize::max(from.inner.len(), to.inner.len()));
+        let mut buf = RelativePathBuf::with_capacity(usize::max(from.len(), to.len()));
 
         for c in head.map(|_| Component::ParentDir).chain(tail) {
             buf.push(c.as_str());
@@ -1924,7 +1569,7 @@ where
 impl From<RelativePathBuf> for Box<RelativePath> {
     #[inline]
     fn from(path: RelativePathBuf) -> Box<RelativePath> {
-        let boxed: Box<str> = path.inner.into();
+        let boxed = Box::<str>::from(path.into_string());
         let rw = Box::into_raw(boxed) as *mut RelativePath;
         unsafe { Box::from_raw(rw) }
     }
@@ -1986,7 +1631,7 @@ impl From<&RelativePath> for Arc<RelativePath> {
 impl From<RelativePathBuf> for Arc<RelativePath> {
     #[inline]
     fn from(path: RelativePathBuf) -> Arc<RelativePath> {
-        let arc: Arc<str> = path.inner.into();
+        let arc = Arc::<str>::from(path.into_string());
         let rw = Arc::into_raw(arc) as *const RelativePath;
         unsafe { Arc::from_raw(rw) }
     }
@@ -2029,7 +1674,7 @@ impl From<&RelativePath> for Rc<RelativePath> {
 impl From<RelativePathBuf> for Rc<RelativePath> {
     #[inline]
     fn from(path: RelativePathBuf) -> Rc<RelativePath> {
-        let rc: Rc<str> = path.inner.into();
+        let rc = Rc::<str>::from(path.into_string());
         let rw = Rc::into_raw(rc) as *const RelativePath;
         unsafe { Rc::from_raw(rw) }
     }
@@ -2059,25 +1704,6 @@ impl fmt::Debug for RelativePath {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "{:?}", &self.inner)
-    }
-}
-
-/// [`AsRef<str>`] implementation for [`RelativePathBuf`].
-///
-/// # Examples
-///
-/// ```
-/// use relative_path::RelativePathBuf;
-///
-/// let path = RelativePathBuf::from("foo/bar");
-/// let string: &str = path.as_ref();
-/// assert_eq!(string, "foo/bar");
-/// ```
-#[cfg(feature = "alloc")]
-impl AsRef<str> for RelativePathBuf {
-    #[inline]
-    fn as_ref(&self) -> &str {
-        &self.inner
     }
 }
 
@@ -2151,7 +1777,10 @@ impl cmp::Ord for RelativePath {
 
 impl Hash for RelativePath {
     #[inline]
-    fn hash<H: Hasher>(&self, h: &mut H) {
+    fn hash<H>(&self, h: &mut H)
+    where
+        H: Hasher,
+    {
         for c in self.components() {
             c.hash(h);
         }
@@ -2159,14 +1788,6 @@ impl Hash for RelativePath {
 }
 
 impl fmt::Display for RelativePath {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&self.inner, f)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl fmt::Display for RelativePathBuf {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.inner, f)
@@ -2181,10 +1802,12 @@ impl fmt::Display for RelativePathBuf {
 ///
 /// [`Path`]: std::path::Path
 /// [`Display`]: core::fmt::Display
+#[deprecated(note = "RelativePath implements std::fmt::Display directly")]
 pub struct Display<'a> {
     path: &'a RelativePath,
 }
 
+#[allow(deprecated)]
 impl fmt::Debug for Display<'_> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -2192,83 +1815,11 @@ impl fmt::Debug for Display<'_> {
     }
 }
 
+#[allow(deprecated)]
 impl fmt::Display for Display<'_> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.path, f)
-    }
-}
-
-/// [`serde::ser::Serialize`] implementation for [`RelativePathBuf`].
-///
-/// ```
-/// use serde::Serialize;
-/// use relative_path::RelativePathBuf;
-///
-/// #[derive(Serialize)]
-/// struct Document {
-///     path: RelativePathBuf,
-/// }
-/// ```
-#[cfg(feature = "alloc")]
-#[cfg(feature = "serde")]
-impl serde::ser::Serialize for RelativePathBuf {
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        serializer.serialize_str(&self.inner)
-    }
-}
-
-/// [`serde::de::Deserialize`] implementation for [`RelativePathBuf`].
-///
-/// ```
-/// use serde::Deserialize;
-/// use relative_path::RelativePathBuf;
-///
-/// #[derive(Deserialize)]
-/// struct Document {
-///     path: RelativePathBuf,
-/// }
-/// ```
-#[cfg(feature = "alloc")]
-#[cfg(feature = "serde")]
-impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::de::Deserializer<'de>,
-    {
-        struct Visitor;
-
-        impl serde::de::Visitor<'_> for Visitor {
-            type Value = RelativePathBuf;
-
-            #[inline]
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a relative path")
-            }
-
-            #[cfg(feature = "alloc")]
-            #[inline]
-            fn visit_string<E>(self, input: String) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Ok(RelativePathBuf::from(input))
-            }
-
-            #[inline]
-            fn visit_str<E>(self, input: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Ok(RelativePathBuf::from(input.to_owned()))
-            }
-        }
-
-        deserializer.deserialize_str(Visitor)
     }
 }
 
@@ -2283,7 +1834,11 @@ impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
 ///     path: Box<RelativePath>,
 /// }
 /// ```
-#[cfg(all(feature = "serde", feature = "alloc"))]
+#[cfg(all(feature = "alloc", feature = "serde"))]
+#[cfg_attr(
+    relative_path_docsrs,
+    doc(cfg(all(feature = "alloc", feature = "serde")))
+)]
 impl<'de> serde::de::Deserialize<'de> for Box<RelativePath> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -2334,6 +1889,7 @@ impl<'de> serde::de::Deserialize<'de> for Box<RelativePath> {
 /// }
 /// ```
 #[cfg(feature = "serde")]
+#[cfg_attr(relative_path_docsrs, doc(cfg(feature = "serde")))]
 impl<'de: 'a, 'a> serde::de::Deserialize<'de> for &'a RelativePath {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -2385,6 +1941,7 @@ impl<'de: 'a, 'a> serde::de::Deserialize<'de> for &'a RelativePath {
 /// }
 /// ```
 #[cfg(feature = "serde")]
+#[cfg_attr(relative_path_docsrs, doc(cfg(feature = "serde")))]
 impl serde::ser::Serialize for RelativePath {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -2395,9 +1952,13 @@ impl serde::ser::Serialize for RelativePath {
     }
 }
 
-#[cfg(feature = "alloc")]
 macro_rules! impl_cmp {
-    ($lhs:ty, $rhs:ty) => {
+    (
+        $(#[cfg(feature = $feature:literal)])?
+        $lhs:ty, $rhs:ty
+    ) => {
+        $(#[cfg(feature = $feature)])*
+        $(#[cfg_attr(relative_path_docsrs, doc(cfg(feature = $feature)))])*
         impl<'a, 'b> PartialEq<$rhs> for $lhs {
             #[inline]
             fn eq(&self, other: &$rhs) -> bool {
@@ -2405,6 +1966,8 @@ macro_rules! impl_cmp {
             }
         }
 
+        $(#[cfg(feature = $feature)])*
+        $(#[cfg_attr(relative_path_docsrs, doc(cfg(feature = $feature)))])*
         impl<'a, 'b> PartialEq<$lhs> for $rhs {
             #[inline]
             fn eq(&self, other: &$lhs) -> bool {
@@ -2412,6 +1975,8 @@ macro_rules! impl_cmp {
             }
         }
 
+        $(#[cfg(feature = $feature)])*
+        $(#[cfg_attr(relative_path_docsrs, doc(cfg(feature = $feature)))])*
         impl<'a, 'b> PartialOrd<$rhs> for $lhs {
             #[inline]
             fn partial_cmp(&self, other: &$rhs) -> Option<cmp::Ordering> {
@@ -2419,6 +1984,8 @@ macro_rules! impl_cmp {
             }
         }
 
+        $(#[cfg(feature = $feature)])*
+        $(#[cfg_attr(relative_path_docsrs, doc(cfg(feature = $feature)))])*
         impl<'a, 'b> PartialOrd<$lhs> for $rhs {
             #[inline]
             fn partial_cmp(&self, other: &$lhs) -> Option<cmp::Ordering> {
@@ -2428,19 +1995,27 @@ macro_rules! impl_cmp {
     };
 }
 
-#[cfg(feature = "alloc")]
-impl_cmp!(RelativePathBuf, RelativePath);
-#[cfg(feature = "alloc")]
-impl_cmp!(RelativePathBuf, &'a RelativePath);
-#[cfg(feature = "alloc")]
-impl_cmp!(Cow<'a, RelativePath>, RelativePath);
-#[cfg(feature = "alloc")]
-impl_cmp!(Cow<'a, RelativePath>, &'b RelativePath);
-#[cfg(feature = "alloc")]
-impl_cmp!(Cow<'a, RelativePath>, RelativePathBuf);
+impl_cmp!(
+    #[cfg(feature = "alloc")]
+    RelativePathBuf,
+    RelativePath
+);
+impl_cmp!(
+    #[cfg(feature = "alloc")]
+    RelativePathBuf,
+    &'a RelativePath
+);
+impl_cmp!(#[cfg(feature = "alloc")] Cow<'a, RelativePath>, RelativePath);
+impl_cmp!(#[cfg(feature = "alloc")] Cow<'a, RelativePath>, &'b RelativePath);
+impl_cmp!(#[cfg(feature = "alloc")] Cow<'a, RelativePath>, RelativePathBuf);
 
 macro_rules! impl_cmp_str {
-    ($lhs:ty, $rhs:ty) => {
+    (
+        $(#[cfg(feature = $feature:literal)])?
+        $lhs:ty, $rhs:ty
+    ) => {
+        $(#[cfg(feature = $feature)])*
+        $(#[cfg_attr(relative_path_docsrs, doc(cfg(feature = $feature)))])*
         impl<'a, 'b> PartialEq<$rhs> for $lhs {
             #[inline]
             fn eq(&self, other: &$rhs) -> bool {
@@ -2448,6 +2023,8 @@ macro_rules! impl_cmp_str {
             }
         }
 
+        $(#[cfg(feature = $feature)])*
+        $(#[cfg_attr(relative_path_docsrs, doc(cfg(feature = $feature)))])*
         impl<'a, 'b> PartialEq<$lhs> for $rhs {
             #[inline]
             fn eq(&self, other: &$lhs) -> bool {
@@ -2455,6 +2032,8 @@ macro_rules! impl_cmp_str {
             }
         }
 
+        $(#[cfg(feature = $feature)])*
+        $(#[cfg_attr(relative_path_docsrs, doc(cfg(feature = $feature)))])*
         impl<'a, 'b> PartialOrd<$rhs> for $lhs {
             #[inline]
             fn partial_cmp(&self, other: &$rhs) -> Option<cmp::Ordering> {
@@ -2462,6 +2041,8 @@ macro_rules! impl_cmp_str {
             }
         }
 
+        $(#[cfg(feature = $feature)])*
+        $(#[cfg_attr(relative_path_docsrs, doc(cfg(feature = $feature)))])*
         impl<'a, 'b> PartialOrd<$lhs> for $rhs {
             #[inline]
             fn partial_cmp(&self, other: &$lhs) -> Option<cmp::Ordering> {
@@ -2471,16 +2052,27 @@ macro_rules! impl_cmp_str {
     };
 }
 
-#[cfg(feature = "alloc")]
-impl_cmp_str!(RelativePathBuf, str);
-#[cfg(feature = "alloc")]
-impl_cmp_str!(RelativePathBuf, &'a str);
-#[cfg(feature = "alloc")]
-impl_cmp_str!(RelativePathBuf, String);
+impl_cmp_str!(
+    #[cfg(feature = "alloc")]
+    RelativePathBuf,
+    str
+);
+impl_cmp_str!(
+    #[cfg(feature = "alloc")]
+    RelativePathBuf,
+    &'a str
+);
+impl_cmp_str!(
+    #[cfg(feature = "alloc")]
+    RelativePathBuf,
+    String
+);
 impl_cmp_str!(RelativePath, str);
 impl_cmp_str!(RelativePath, &'a str);
-#[cfg(feature = "alloc")]
-impl_cmp_str!(RelativePath, String);
+impl_cmp_str!(
+    #[cfg(feature = "alloc")]
+    RelativePath,
+    String
+);
 impl_cmp_str!(&'a RelativePath, str);
-#[cfg(feature = "alloc")]
-impl_cmp_str!(&'a RelativePath, String);
+impl_cmp_str!(#[cfg(feature = "alloc")] &'a RelativePath, String);

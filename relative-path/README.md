@@ -30,7 +30,7 @@ For more utilities to manipulate relative paths, see the
 Add `relative-path` to your `Cargo.toml`:
 
 ```toml
-relative-path = "1.9.2"
+relative-path = "2.0.0"
 ```
 
 Start using relative paths:

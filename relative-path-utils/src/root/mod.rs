@@ -2,6 +2,9 @@
 //
 // See https://github.com/rust-lang/rust
 
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::{self, Read, Write};

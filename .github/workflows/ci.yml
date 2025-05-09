@@ -54,6 +54,23 @@ jobs:
     - run: cargo check -p relative-path --no-default-features --features "${{matrix.feature}}"
     - run: cargo clippy -p relative-path --no-default-features --features "${{matrix.feature}}"
 
+  build_utils_feature:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        feature: ["", root, alloc, "root,alloc", std, "alloc,std"]
+    env:
+      RUSTFLAGS: -D warnings
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@1.66
+      with:
+        components: clippy
+    - uses: Swatinem/rust-cache@v2
+    - run: cargo check -p relative-path-utils --no-default-features --features "${{matrix.feature}}"
+    - run: cargo clippy -p relative-path-utils --no-default-features --features "${{matrix.feature}}"
+  
   clippy:
     runs-on: ubuntu-latest
     steps:

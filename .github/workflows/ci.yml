@@ -64,6 +64,17 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@nightly
+    - uses: Swatinem/rust-cache@v2
+    - run: cargo doc -p relative-path --all-features
+      env:
+        RUSTFLAGS: --cfg relative_path_docsrs
+        RUSTDOCFLAGS: --cfg relative_path_docsrs
+
   rustfmt:
     runs-on: ubuntu-latest
     steps:

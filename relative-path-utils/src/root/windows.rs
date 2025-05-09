@@ -1,13 +1,17 @@
+use core::mem::{self, align_of, size_of, MaybeUninit};
+use core::ptr;
+use core::slice;
+
+use alloc::vec::Vec;
+
 use std::ffi::OsString;
 use std::fs::File;
-use std::mem::{self, align_of, size_of, MaybeUninit};
+use std::io;
 use std::os::windows::ffi::OsStringExt;
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{AsHandle, AsRawHandle, FromRawHandle, OwnedHandle, RawHandle};
 use std::path::Path;
 use std::path::MAIN_SEPARATOR;
-use std::ptr;
-use std::{io, slice};
 
 use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
 use windows_sys::Wdk::Storage::FileSystem as nt;

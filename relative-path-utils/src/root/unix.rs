@@ -1,7 +1,10 @@
+use core::mem::MaybeUninit;
+
+use alloc::vec::Vec;
+
 use std::ffi::{CString, OsString};
 use std::fs::File;
 use std::io;
-use std::mem::MaybeUninit;
 use std::os::fd::OwnedFd;
 use std::os::fd::{AsFd, AsRawFd};
 use std::os::fd::{FromRawFd, IntoRawFd};

@@ -13,13 +13,26 @@
 //! [`Root`]: https://docs.rs/relative-path-utils/latest/relative_path_utils/struct.Root.html
 //! [`Glob`]: https://docs.rs/relative-path-utils/latest/relative_path_utils/struct.Glob.html
 
+#![deny(missing_docs)]
+#![no_std]
+#![cfg_attr(relative_path_docsrs, feature(doc_cfg))]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+#[cfg(feature = "std")]
+extern crate std;
+
 #[cfg(feature = "root")]
+#[cfg_attr(relative_path_docsrs, doc(cfg(feature = "root")))]
 #[doc(inline)]
 pub use self::root::{DirEntry, Metadata, OpenOptions, ReadDir, Root};
 #[cfg(feature = "root")]
 mod root;
 
 #[cfg(feature = "root")]
+#[cfg_attr(relative_path_docsrs, doc(cfg(feature = "root")))]
+#[doc(inline)]
 pub use self::glob::Glob;
 #[cfg(feature = "root")]
 mod glob;

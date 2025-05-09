@@ -1,10 +1,15 @@
 #[cfg(test)]
 mod tests;
 
-use std::collections::VecDeque;
-use std::fmt;
+use core::fmt;
+use core::mem;
+
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::collections::VecDeque;
+use alloc::vec::Vec;
+
 use std::io;
-use std::mem;
 
 use relative_path::{RelativePath, RelativePathBuf};
 

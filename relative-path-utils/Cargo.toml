@@ -1,6 +1,6 @@
 [package]
 name = "relative-path-utils"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.66"
@@ -13,11 +13,16 @@ license = "MIT OR Apache-2.0"
 keywords = ["path"]
 categories = ["filesystem"]
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(relative_path_docsrs)'] }
+
 [features]
-root = ["dep:windows-sys", "dep:libc", "dep:errno"]
+alloc = []
+std = []
+root = ["alloc", "std", "dep:windows-sys", "dep:libc", "dep:errno"]
 
 [dependencies]
-relative-path = { path = "../relative-path", version = "1.9.2", default-features = false, features = ["alloc"] }
+relative-path = { path = "../relative-path", version = "2.0.0", default-features = false, features = ["alloc"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.52.0"
@@ -44,3 +49,4 @@ serde = { version = "1.0.160", features = ["derive"] }
 
 [package.metadata.docs.rs]
 all-features = true
+rustdoc-args = ["--cfg", "relative_path_docsrs"]

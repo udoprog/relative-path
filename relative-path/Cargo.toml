@@ -1,6 +1,6 @@
 [package]
 name = "relative-path"
-version = "2.0.0"
+version = "2.0.1"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.66"
@@ -17,7 +17,7 @@ categories = ["filesystem"]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(relative_path_docsrs)'] }
 
 [features]
-default = ["std"]
+default = ["std", "alloc"]
 alloc = ["serde?/alloc"]
 std = []
 serde = ["dep:serde" ]

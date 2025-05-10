@@ -1,6 +1,6 @@
 [package]
 name = "relative-path-utils"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.66"
@@ -17,12 +17,13 @@ categories = ["filesystem"]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(relative_path_docsrs)'] }
 
 [features]
+default = ["root"]
 alloc = []
 std = []
 root = ["alloc", "std", "dep:windows-sys", "dep:libc", "dep:errno"]
 
 [dependencies]
-relative-path = { path = "../relative-path", version = "2.0.0", default-features = false, features = ["alloc"] }
+relative-path = { path = "../relative-path", version = "2.0.1", default-features = false, features = ["alloc"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.52.0"

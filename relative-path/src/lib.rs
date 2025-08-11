@@ -772,7 +772,7 @@ impl RelativePath {
     #[must_use]
     #[inline]
     #[allow(deprecated)]
-    pub fn display(&self) -> Display {
+    pub fn display(&self) -> Display<'_> {
         Display { path: self }
     }
 
@@ -815,7 +815,7 @@ impl RelativePath {
     /// ```
     #[must_use]
     #[inline]
-    pub fn components(&self) -> Components {
+    pub fn components(&self) -> Components<'_> {
         Components::new(&self.inner)
     }
 
@@ -839,7 +839,7 @@ impl RelativePath {
     /// ```
     #[must_use]
     #[inline]
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         Iter {
             inner: self.components(),
         }

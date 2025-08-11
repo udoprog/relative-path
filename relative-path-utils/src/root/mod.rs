@@ -70,7 +70,7 @@ impl Root {
     /// let file = root.open_options().read(true).open("foo.txt");
     /// # Ok::<_, std::io::Error>(())
     /// ```
-    pub fn open_options(&self) -> OpenOptions {
+    pub fn open_options(&self) -> OpenOptions<'_> {
         OpenOptions {
             root: &self.inner,
             options: imp::OpenOptions::new(),

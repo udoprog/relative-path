@@ -21,9 +21,11 @@ default = ["std", "alloc"]
 alloc = ["serde?/alloc"]
 std = []
 serde = ["dep:serde" ]
+camino = ["dep:camino", "std"]
 
 [dependencies]
 serde = { version = "1.0.160", optional = true, default-features = false }
+camino = { version = "1", optional = true }
 
 [dev-dependencies]
 anyhow = "1.0.76"

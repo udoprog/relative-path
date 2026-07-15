@@ -1752,6 +1752,14 @@ impl AsRef<RelativePath> for RelativePath {
     }
 }
 
+#[cfg(feature = "camino")]
+impl AsRef<camino::Utf8Path> for RelativePath {
+    #[inline]
+    fn as_ref(&self) -> &camino::Utf8Path {
+        camino::Utf8Path::new(self.as_str())
+    }
+}
+
 impl cmp::PartialEq for RelativePath {
     #[inline]
     fn eq(&self, other: &RelativePath) -> bool {

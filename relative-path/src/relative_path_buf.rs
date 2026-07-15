@@ -338,6 +338,14 @@ impl<'a> From<RelativePathBuf> for Cow<'a, RelativePath> {
     }
 }
 
+#[cfg(feature = "camino")]
+impl From<RelativePathBuf> for camino::Utf8PathBuf {
+    #[inline]
+    fn from(s: RelativePathBuf) -> camino::Utf8PathBuf {
+        String::from(s).into()
+    }
+}
+
 impl fmt::Debug for RelativePathBuf {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {

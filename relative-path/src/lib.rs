@@ -1702,8 +1702,8 @@ impl ToOwned for RelativePath {
 
 impl fmt::Debug for RelativePath {
     #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{:?}", &self.inner)
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.inner.fmt(f)
     }
 }
 
@@ -1790,7 +1790,7 @@ impl Hash for RelativePath {
 impl fmt::Display for RelativePath {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&self.inner, f)
+        self.inner.fmt(f)
     }
 }
 

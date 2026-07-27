@@ -340,8 +340,8 @@ impl<'a> From<RelativePathBuf> for Cow<'a, RelativePath> {
 
 impl fmt::Debug for RelativePathBuf {
     #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{:?}", &self.inner)
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.inner.fmt(f)
     }
 }
 
@@ -462,7 +462,7 @@ where
 impl fmt::Display for RelativePathBuf {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&self.inner, f)
+        self.inner.fmt(f)
     }
 }
 

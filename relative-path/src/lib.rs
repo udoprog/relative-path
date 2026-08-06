@@ -338,6 +338,8 @@ use alloc::sync::Arc;
 #[cfg(feature = "std")]
 use std::error;
 #[cfg(feature = "std")]
+use std::ffi;
+#[cfg(feature = "std")]
 use std::path;
 
 const STEM_SEP: char = '.';
@@ -716,9 +718,24 @@ impl RelativePath {
     where
         P: ?Sized + AsRef<path::Path>,
     {
-        use std::path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
+        Self::from_path_like(path.as_ref())
+    }
 
-        let other = path.as_ref();
+    /// Try to convert a [`camino::Utf8Path`] to a [`RelativePath`] without allocating a buffer.
+    ///
+    /// Mirrors [`Self::from_utf8_path`], but avoids a UTF8 check.
+    #[cfg(feature = "camino")] // camino implies std
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "camino")))]
+    pub fn from_utf8_path<P>(path: &P) -> Result<&RelativePath, FromPathError>
+    where
+        P: ?Sized + AsRef<camino::Utf8Path>,
+    {
+        Self::from_path_like(path.as_ref())
+    }
+
+    #[cfg(feature = "std")]
+    fn from_path_like<P: PathLike + ?Sized>(other: &P) -> Result<&RelativePath, FromPathError> {
+        use std::path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
 
         let s = match other.to_str() {
             Some(s) => s,
@@ -728,7 +745,7 @@ impl RelativePath {
         let rel = RelativePath::new(s);
 
         // check that the component compositions are equal.
-        for (a, b) in other.components().zip(rel.components()) {
+        for (a, b) in other.as_path().components().zip(rel.components()) {
             match (a, b) {
                 (Prefix(_) | RootDir, _) => return Err(FromPathErrorKind::NonRelative.into()),
                 (CurDir, Component::CurDir) | (ParentDir, Component::ParentDir) => continue,
@@ -907,17 +924,33 @@ impl RelativePath {
     where
         P: AsRef<path::Path>,
     {
-        let mut p = base.as_ref().to_path_buf().into_os_string();
+        self.to_path_like(base.as_ref())
+    }
+
+    /// Like [`Self::to_path`] but for [`camino::Utf8PathBuf`]
+    #[cfg(feature = "camino")]
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "camino")))]
+    #[must_use]
+    pub fn to_utf8_path<P>(&self, base: P) -> camino::Utf8PathBuf
+    where
+        P: AsRef<camino::Utf8Path>,
+    {
+        self.to_path_like(base.as_ref())
+    }
+
+    #[cfg(feature = "std")]
+    fn to_path_like<P: PathLike + ?Sized>(&self, base: &P) -> P::Buffer {
+        let mut p: P::String = P::String::from(base.to_owned());
 
         for c in self.components() {
             if !p.is_empty() {
-                p.push(path::MAIN_SEPARATOR.encode_utf8(&mut [0u8, 0u8, 0u8, 0u8]));
+                p.push_str(path::MAIN_SEPARATOR.encode_utf8(&mut [0u8, 0u8, 0u8, 0u8]));
             }
 
-            p.push(c.as_str());
+            p.push_str(c.as_str());
         }
 
-        path::PathBuf::from(p)
+        P::Buffer::from(p)
     }
 
     /// Build an owned [`PathBuf`] relative to `base` for the current relative
@@ -1004,29 +1037,48 @@ impl RelativePath {
     where
         P: AsRef<path::Path>,
     {
+        self.to_logical_path_kind(base.as_ref())
+    }
+
+    /// Like [`Self::to_logical_path`] but for [`camino::Utf8PathBuf`].
+    #[cfg(feature = "camino")]
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "camino")))]
+    #[must_use]
+    pub fn to_logical_utf8_path<P>(&self, base: P) -> camino::Utf8PathBuf
+    where
+        P: AsRef<camino::Utf8Path>,
+    {
+        self.to_logical_path_kind(base.as_ref())
+    }
+
+    #[cfg(feature = "std")]
+    fn to_logical_path_kind<P>(&self, base: &P) -> P::Buffer
+    where
+        P: PathLike + ?Sized,
+    {
         use self::Component::{CurDir, Normal, ParentDir};
 
-        let mut p = base.as_ref().to_path_buf().into_os_string();
+        let mut p = P::String::from(base.to_owned());
 
         for c in self.components() {
             match c {
                 CurDir => continue,
                 ParentDir => {
-                    let mut temp = path::PathBuf::from(std::mem::take(&mut p));
+                    let mut temp = P::Buffer::from(std::mem::take(&mut p));
                     temp.pop();
-                    p = temp.into_os_string();
+                    p = P::String::from(temp);
                 }
                 Normal(c) => {
                     if !p.is_empty() {
-                        p.push(path::MAIN_SEPARATOR.encode_utf8(&mut [0u8, 0u8, 0u8, 0u8]));
+                        p.push_str(path::MAIN_SEPARATOR.encode_utf8(&mut [0u8, 0u8, 0u8, 0u8]));
                     }
 
-                    p.push(c);
+                    p.push_str(c);
                 }
             }
         }
 
-        path::PathBuf::from(p)
+        P::Buffer::from(p)
     }
 
     /// Returns a relative path, without its final [`Component`] if there is one.
@@ -1508,6 +1560,138 @@ impl<'a> IntoIterator for &'a RelativePath {
     }
 }
 
+
+/// Internal trait to abstract over [`std::path::Path`] and [`camino::Utf8Path`].
+///
+/// [`camino::Utf8Path`]: https://docs.rs/camino/1/camino/struct.Utf8Path.html
+#[cfg(feature = "std")]
+trait PathLike: ToOwned<Owned = Self::Buffer> {
+    type String: OwnedStringLike + From<Self::Buffer>;
+    type Buffer: OwnedPathLike + From<Self::String>;
+    type Component<'a>: ComponentLike<'a> + 'a
+    where
+        Self: 'a;
+    type ComponentIter<'a>: Iterator<Item = Self::Component<'a>> + 'a
+    where
+        Self: 'a;
+    fn as_path(&self) -> &path::Path;
+    fn to_str(&self) -> Option<&str>;
+    fn components(&self) -> Self::ComponentIter<'_>;
+}
+#[cfg(feature = "std")]
+impl PathLike for path::Path {
+    type String = ffi::OsString;
+    type Buffer = path::PathBuf;
+    type Component<'a> = path::Component<'a>;
+    type ComponentIter<'a> = path::Components<'a>;
+
+    #[inline]
+    fn as_path(&self) -> &path::Path {
+        self
+    }
+    #[inline]
+    fn to_str(&self) -> Option<&str> {
+        self.to_str()
+    }
+    #[inline]
+    fn components(&self) -> Self::ComponentIter<'_> {
+        self.components()
+    }
+}
+#[cfg(feature = "camino")] // camino implies std
+impl PathLike for camino::Utf8Path {
+    type String = String;
+    type Buffer = camino::Utf8PathBuf;
+    type Component<'a> = camino::Utf8Component<'a>;
+    type ComponentIter<'a> = camino::Utf8Components<'a>;
+
+    #[inline]
+    fn as_path(&self) -> &path::Path {
+        self.as_ref()
+    }
+    #[inline]
+    fn to_str(&self) -> Option<&str> {
+        Some(self.as_str())
+    }
+
+    #[inline]
+    fn components(&self) -> Self::ComponentIter<'_> {
+        self.components()
+    }
+}
+#[cfg(feature = "std")]
+trait ComponentLike<'a> {
+    fn to_relative_component(self) -> Result<Component<'a>, FromPathErrorKind>;
+}
+#[cfg(feature = "std")]
+impl<'a> ComponentLike<'a> for path::Component<'a> {
+    fn to_relative_component(self) -> Result<Component<'a>, FromPathErrorKind> {
+        use path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
+        match self {
+            Prefix(_) | RootDir => Err(FromPathErrorKind::NonRelative),
+            CurDir => Ok(Component::CurDir),
+            ParentDir => Ok(Component::ParentDir),
+            Normal(s) => Ok(Component::Normal(
+                s.to_str().ok_or(FromPathErrorKind::NonUtf8)?,
+            )),
+        }
+    }
+}
+#[cfg(feature = "camino")]
+impl<'a> ComponentLike<'a> for camino::Utf8Component<'a> {
+    fn to_relative_component(self) -> Result<Component<'a>, FromPathErrorKind> {
+        use camino::Utf8Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
+        match self {
+            Prefix(_) | RootDir => Err(FromPathErrorKind::NonRelative),
+            CurDir => Ok(Component::CurDir),
+            ParentDir => Ok(Component::ParentDir),
+            Normal(s) => Ok(Component::Normal(s)),
+        }
+    }
+}
+#[cfg(feature = "std")]
+trait OwnedPathLike {
+    fn pop(&mut self) -> bool;
+}
+#[cfg(feature = "std")]
+impl OwnedPathLike for path::PathBuf {
+    #[inline]
+    fn pop(&mut self) -> bool {
+        self.pop()
+    }
+}
+#[cfg(feature = "camino")]
+impl OwnedPathLike for camino::Utf8PathBuf {
+    #[inline]
+    fn pop(&mut self) -> bool {
+        self.pop()
+    }
+}
+/// Internal trait to abstract over [`String`] and [`ffi::OsString`]
+#[cfg(feature = "std")]
+trait OwnedStringLike: AsRef<ffi::OsStr> + Default {
+    fn push_str(&mut self, s: &str);
+    #[inline]
+    fn is_empty(&self) -> bool {
+        let x: &ffi::OsStr = self.as_ref();
+        x.is_empty()
+    }
+}
+#[cfg(feature = "std")]
+impl OwnedStringLike for ffi::OsString {
+    #[inline]
+    fn push_str(&mut self, s: &str) {
+        self.push(s)
+    }
+}
+#[cfg(feature = "std")]
+impl OwnedStringLike for String {
+    #[inline]
+    fn push_str(&mut self, s: &str) {
+        self.push_str(s)
+    }
+}
+
 /// Conversion from a [`Box<str>`] reference to a [`Box<RelativePath>`].
 ///
 /// # Examples
@@ -1749,6 +1933,14 @@ impl AsRef<RelativePath> for RelativePath {
     #[inline]
     fn as_ref(&self) -> &RelativePath {
         self
+    }
+}
+
+#[cfg(feature = "camino")]
+impl<'a> From<&'a RelativePath> for &'a camino::Utf8Path {
+    #[inline]
+    fn from(x: &'a RelativePath) -> &'a camino::Utf8Path {
+        x.as_ref()
     }
 }
 

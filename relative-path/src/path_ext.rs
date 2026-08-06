@@ -29,6 +29,10 @@ mod sealed {
 
     impl Sealed for Path {}
     impl Sealed for PathBuf {}
+    #[cfg(feature = "camino")]
+    impl Sealed for camino::Utf8Path {}
+    #[cfg(feature = "camino")]
+    impl Sealed for camino::Utf8PathBuf {}
 }
 
 /// An error raised when attempting to convert a path using
@@ -122,8 +126,27 @@ pub trait PathExt: sealed::Sealed {
     fn relative_to<P>(&self, root: P) -> Result<RelativePathBuf, RelativeToError>
     where
         P: AsRef<Path>;
+    /// Like [`PathExt::relative_to`], but for a [`camino::Utf8Path`].
+    #[cfg(feature = "camino")]
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "camino")))]
+    fn relative_to_utf8<P>(&self, root: P) -> Result<RelativePathBuf, RelativeToError>
+    where
+        P: AsRef<camino::Utf8Path>,
+    {
+        // right now this doesn't avoid any of the UTF8 checks
+        self.relative_to(root.as_ref().as_std_path())
+    }
 }
-
+#[cfg(feature = "camino")]
+impl PathExt for camino::Utf8Path {
+    fn relative_to<P>(&self, root: P) -> Result<RelativePathBuf, RelativeToError>
+    where
+        P: AsRef<Path>,
+    {
+        // right now this doesn't avoid any of the UTF8 checks
+        self.as_std_path().relative_to(root)
+    }
+}
 impl PathExt for Path {
     fn relative_to<P>(&self, root: P) -> Result<RelativePathBuf, RelativeToError>
     where
@@ -216,6 +239,16 @@ impl PathExt for Path {
 }
 
 impl PathExt for PathBuf {
+    #[inline]
+    fn relative_to<P>(&self, root: P) -> Result<RelativePathBuf, RelativeToError>
+    where
+        P: AsRef<Path>,
+    {
+        self.as_path().relative_to(root)
+    }
+}
+#[cfg(feature = "camino")]
+impl PathExt for camino::Utf8PathBuf {
     #[inline]
     fn relative_to<P>(&self, root: P) -> Result<RelativePathBuf, RelativeToError>
     where

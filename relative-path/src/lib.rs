@@ -27,7 +27,7 @@
 //! Add `relative-path` to your `Cargo.toml`:
 //!
 //! ```toml
-//! relative-path = "2.0.1"
+//! relative-path = "2.0.2"
 //! ```
 //!
 //! Start using relative paths:

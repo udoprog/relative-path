@@ -23,7 +23,7 @@ std = []
 root = ["alloc", "std", "dep:windows-sys", "dep:libc", "dep:errno"]
 
 [dependencies]
-relative-path = { path = "../relative-path", version = "2.0.1", default-features = false, features = ["alloc"] }
+relative-path = { path = "../relative-path", version = "2.0.2", default-features = false, features = ["alloc"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.61.2"

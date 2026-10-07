@@ -21,7 +21,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@1.66
+    - uses: dtolnay/rust-toolchain@1.71
     - run: cargo build --workspace --all-features
 
   test:
@@ -47,7 +47,7 @@ jobs:
       RUSTFLAGS: -D warnings
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@1.66
+    - uses: dtolnay/rust-toolchain@1.71
       with:
         components: clippy
     - uses: Swatinem/rust-cache@v2
@@ -64,7 +64,7 @@ jobs:
       RUSTFLAGS: -D warnings
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@1.66
+    - uses: dtolnay/rust-toolchain@1.71
       with:
         components: clippy
     - uses: Swatinem/rust-cache@v2

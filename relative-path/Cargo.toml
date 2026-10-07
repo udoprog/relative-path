@@ -3,7 +3,7 @@ name = "relative-path"
 version = "2.0.1"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
-rust-version = "1.66"
+rust-version = "1.71"
 description = "Portable, relative paths for Rust."
 documentation = "https://docs.rs/relative-path"
 readme = "README.md"
@@ -27,7 +27,7 @@ serde = { version = "1.0.160", optional = true, default-features = false }
 
 [dev-dependencies]
 anyhow = "1.0.76"
-foldhash = "0.1.5"
+foldhash = "0.2.0"
 serde = { version = "1.0.160", features = ["derive"] }
 
 [package.metadata.docs.rs]

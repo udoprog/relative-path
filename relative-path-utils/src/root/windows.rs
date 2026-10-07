@@ -124,7 +124,7 @@ impl Root {
         unsafe {
             let mut info = MaybeUninit::zeroed();
 
-            if c::GetFileInformationByHandle(handle.as_raw_handle() as isize, info.as_mut_ptr())
+            if c::GetFileInformationByHandle(handle.as_raw_handle() as HANDLE, info.as_mut_ptr())
                 == FALSE
             {
                 return Err(io::Error::last_os_error());
@@ -138,7 +138,7 @@ impl Root {
                 let mut attr_tag = MaybeUninit::<c::FILE_ATTRIBUTE_TAG_INFO>::zeroed();
 
                 let result = c::GetFileInformationByHandleEx(
-                    self.handle.as_raw_handle() as isize,
+                    self.handle.as_raw_handle() as HANDLE,
                     c::FileAttributeTagInfo,
                     attr_tag.as_mut_ptr().cast(),
                     mem::size_of::<c::FILE_ATTRIBUTE_TAG_INFO>()
@@ -255,7 +255,7 @@ impl Iterator for ReadDir {
 
                 let status = nt::NtQueryDirectoryFileEx(
                     self.handle.as_raw_handle() as HANDLE,
-                    0,
+                    ptr::null_mut(),
                     None,
                     ptr::null(),
                     &mut status_block,

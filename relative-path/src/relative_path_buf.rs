@@ -15,7 +15,7 @@ use std::path;
 use super::{Component, RelativePath, PARENT_STR, SEP, STEM_SEP};
 
 #[cfg(feature = "std")]
-use super::{FromPathError, FromPathErrorKind};
+use super::{FromPathError, PathLike, ComponentLike};
 
 /// Traverse the given components and apply to the provided stack.
 ///
@@ -108,16 +108,32 @@ impl RelativePathBuf {
     where
         P: AsRef<path::Path>,
     {
-        use std::path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
+        Self::from_path_like(path.as_ref())
+    }
 
+    /// Like [`Self::from_path`] but for [`camino::Utf8Path`].
+    #[cfg(feature = "camino")]
+    #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "camino")))]
+    #[inline]
+    pub fn from_utf8_path<P>(path: P) -> Result<RelativePathBuf, FromPathError>
+    where
+        P: AsRef<camino::Utf8Path>,
+    {
+        Self::from_path_like(path.as_ref())
+    }
+
+    #[cfg(feature = "std")]
+    #[inline]
+    fn from_path_like<P: PathLike + ?Sized>(path: &P) -> Result<RelativePathBuf, FromPathError> {
         let mut buffer = RelativePathBuf::new();
 
-        for c in path.as_ref().components() {
-            match c {
-                Prefix(_) | RootDir => return Err(FromPathErrorKind::NonRelative.into()),
-                CurDir => continue,
-                ParentDir => buffer.push(PARENT_STR),
-                Normal(s) => buffer.push(s.to_str().ok_or(FromPathErrorKind::NonUtf8)?),
+        for c in path.components() {
+            match c.to_relative_component()? {
+                Component::CurDir => continue,
+                Component::ParentDir => buffer.push(PARENT_STR),
+                Component::Normal(s) => {
+                    buffer.push(s);
+                }
             }
         }
 
@@ -338,6 +354,14 @@ impl<'a> From<RelativePathBuf> for Cow<'a, RelativePath> {
     }
 }
 
+#[cfg(feature = "camino")]
+impl From<RelativePathBuf> for camino::Utf8PathBuf {
+    #[inline]
+    fn from(s: RelativePathBuf) -> camino::Utf8PathBuf {
+        String::from(s).into()
+    }
+}
+
 impl fmt::Debug for RelativePathBuf {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -356,6 +380,14 @@ impl AsRef<str> for RelativePath {
     #[inline]
     fn as_ref(&self) -> &str {
         &self.inner
+    }
+}
+
+#[cfg(feature = "camino")]
+impl AsRef<camino::Utf8Path> for RelativePath {
+    #[inline]
+    fn as_ref(&self) -> &camino::Utf8Path {
+        camino::Utf8Path::new(&self.inner)
     }
 }
 

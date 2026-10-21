@@ -1,6 +1,6 @@
 [package]
 name = "relative-path-utils"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.85"
@@ -22,7 +22,7 @@ std = []
 root = ["alloc", "std", "dep:windows-sys", "dep:libc", "dep:errno"]
 
 [dependencies]
-relative-path = { path = "../relative-path", version = "2.0.2", default-features = false, features = ["alloc"] }
+relative-path = { path = "../relative-path", version = "2.0.3", default-features = false, features = ["alloc"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.61.2"

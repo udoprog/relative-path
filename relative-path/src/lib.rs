@@ -1854,14 +1854,14 @@ impl fmt::Display for Display<'_> {
     relative_path_docsrs,
     doc(cfg(all(feature = "alloc", feature = "serde")))
 )]
-impl<'de> serde::de::Deserialize<'de> for Box<RelativePath> {
+impl<'de> serde_core::de::Deserialize<'de> for Box<RelativePath> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::de::Deserializer<'de>,
+        D: serde_core::de::Deserializer<'de>,
     {
         struct Visitor;
 
-        impl serde::de::Visitor<'_> for Visitor {
+        impl serde_core::de::Visitor<'_> for Visitor {
             type Value = Box<RelativePath>;
 
             #[inline]
@@ -1873,7 +1873,7 @@ impl<'de> serde::de::Deserialize<'de> for Box<RelativePath> {
             #[inline]
             fn visit_string<E>(self, input: String) -> Result<Self::Value, E>
             where
-                E: serde::de::Error,
+                E: serde_core::de::Error,
             {
                 Ok(Box::<RelativePath>::from(input.into_boxed_str()))
             }
@@ -1881,7 +1881,7 @@ impl<'de> serde::de::Deserialize<'de> for Box<RelativePath> {
             #[inline]
             fn visit_str<E>(self, input: &str) -> Result<Self::Value, E>
             where
-                E: serde::de::Error,
+                E: serde_core::de::Error,
             {
                 Ok(Box::<RelativePath>::from(input))
             }
@@ -1905,14 +1905,14 @@ impl<'de> serde::de::Deserialize<'de> for Box<RelativePath> {
 /// ```
 #[cfg(feature = "serde")]
 #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "serde")))]
-impl<'de: 'a, 'a> serde::de::Deserialize<'de> for &'a RelativePath {
+impl<'de: 'a, 'a> serde_core::de::Deserialize<'de> for &'a RelativePath {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::de::Deserializer<'de>,
+        D: serde_core::de::Deserializer<'de>,
     {
         struct Visitor;
 
-        impl<'a> serde::de::Visitor<'a> for Visitor {
+        impl<'a> serde_core::de::Visitor<'a> for Visitor {
             type Value = &'a RelativePath;
 
             #[inline]
@@ -1923,7 +1923,7 @@ impl<'de: 'a, 'a> serde::de::Deserialize<'de> for &'a RelativePath {
             #[inline]
             fn visit_borrowed_str<E>(self, v: &'a str) -> Result<Self::Value, E>
             where
-                E: serde::de::Error,
+                E: serde_core::de::Error,
             {
                 Ok(RelativePath::new(v))
             }
@@ -1931,10 +1931,13 @@ impl<'de: 'a, 'a> serde::de::Deserialize<'de> for &'a RelativePath {
             #[inline]
             fn visit_borrowed_bytes<E>(self, v: &'a [u8]) -> Result<Self::Value, E>
             where
-                E: serde::de::Error,
+                E: serde_core::de::Error,
             {
                 let string = str::from_utf8(v).map_err(|_| {
-                    serde::de::Error::invalid_value(serde::de::Unexpected::Bytes(v), &self)
+                    serde_core::de::Error::invalid_value(
+                        serde_core::de::Unexpected::Bytes(v),
+                        &self,
+                    )
                 })?;
                 Ok(RelativePath::new(string))
             }
@@ -1957,11 +1960,11 @@ impl<'de: 'a, 'a> serde::de::Deserialize<'de> for &'a RelativePath {
 /// ```
 #[cfg(feature = "serde")]
 #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "serde")))]
-impl serde::ser::Serialize for RelativePath {
+impl serde_core::ser::Serialize for RelativePath {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::ser::Serializer,
+        S: serde_core::ser::Serializer,
     {
         serializer.serialize_str(&self.inner)
     }

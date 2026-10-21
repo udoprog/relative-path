@@ -497,11 +497,11 @@ impl AsRef<str> for RelativePathBuf {
 /// ```
 #[cfg(feature = "serde")]
 #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "serde")))]
-impl serde::ser::Serialize for RelativePathBuf {
+impl serde_core::ser::Serialize for RelativePathBuf {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::ser::Serializer,
+        S: serde_core::ser::Serializer,
     {
         serializer.serialize_str(&self.inner)
     }
@@ -520,14 +520,14 @@ impl serde::ser::Serialize for RelativePathBuf {
 /// ```
 #[cfg(feature = "serde")]
 #[cfg_attr(relative_path_docsrs, doc(cfg(feature = "serde")))]
-impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
+impl<'de> serde_core::de::Deserialize<'de> for RelativePathBuf {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::de::Deserializer<'de>,
+        D: serde_core::de::Deserializer<'de>,
     {
         struct Visitor;
 
-        impl serde::de::Visitor<'_> for Visitor {
+        impl serde_core::de::Visitor<'_> for Visitor {
             type Value = RelativePathBuf;
 
             #[inline]
@@ -538,7 +538,7 @@ impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
             #[inline]
             fn visit_string<E>(self, input: String) -> Result<Self::Value, E>
             where
-                E: serde::de::Error,
+                E: serde_core::de::Error,
             {
                 Ok(RelativePathBuf::from(input))
             }
@@ -546,7 +546,7 @@ impl<'de> serde::de::Deserialize<'de> for RelativePathBuf {
             #[inline]
             fn visit_str<E>(self, input: &str) -> Result<Self::Value, E>
             where
-                E: serde::de::Error,
+                E: serde_core::de::Error,
             {
                 Ok(RelativePathBuf::from(input.to_owned()))
             }

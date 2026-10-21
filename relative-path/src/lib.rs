@@ -54,6 +54,17 @@
 //!
 //! <br>
 //!
+//! ## Musli Support
+//!
+//! This library includes [Müsli] 0.2 support that can be enabled with the
+//! `musli02` feature. Paths are encoded as strings, the same representation the
+//! serde support uses.
+//!
+//! Encoding a `Box<RelativePath>` uses musli's implementation for `Box`, which
+//! requires musli's `alloc` feature.
+//!
+//! <br>
+//!
 //! ## Why is `std::path` a portability hazard?
 //!
 //! Path representations differ across platforms.
@@ -283,6 +294,7 @@
 //! [windows-reserved]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
 //! [windows-case]: https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity
 //! [`relative-path-utils` crate]: https://docs.rs/relative-path-utils
+//! [Müsli]: https://docs.rs/musli/0.2
 
 // This file contains parts that are Copyright 2015 The Rust Project Developers, copied from:
 // https://github.com/rust-lang/rust
@@ -303,6 +315,9 @@ mod path_ext;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(feature = "musli02")]
+mod musli02;
 
 #[cfg(all(feature = "alloc", feature = "std"))]
 #[cfg_attr(

@@ -21,7 +21,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@1.71
+    - uses: dtolnay/rust-toolchain@1.85
     - run: cargo build --workspace --all-features
 
   test:
@@ -47,7 +47,24 @@ jobs:
       RUSTFLAGS: -D warnings
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@1.71
+    - uses: dtolnay/rust-toolchain@1.85
+      with:
+        components: clippy
+    - uses: Swatinem/rust-cache@v2
+    - run: cargo check -p relative-path --no-default-features --features "${{matrix.feature}}"
+    - run: cargo clippy -p relative-path --no-default-features --features "${{matrix.feature}}"
+
+  build_musli02_feature:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        feature: [musli02, "musli02,alloc,std"]
+    env:
+      RUSTFLAGS: -D warnings
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy
     - uses: Swatinem/rust-cache@v2
@@ -64,7 +81,7 @@ jobs:
       RUSTFLAGS: -D warnings
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@1.71
+    - uses: dtolnay/rust-toolchain@1.85
       with:
         components: clippy
     - uses: Swatinem/rust-cache@v2

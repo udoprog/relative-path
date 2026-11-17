@@ -257,6 +257,54 @@ impl RelativePathBuf {
         true
     }
 
+    /// Append [`extension`] to `extension`.
+    ///
+    /// Returns `false` and does nothing if
+    /// [`file_name`][RelativePath::file_name] is [`None`], returns `true` and
+    /// updates the extension otherwise.
+    ///
+    /// [`extension`]: RelativePath::extension
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use relative_path::{RelativePath, RelativePathBuf};
+    ///
+    /// let mut p = RelativePathBuf::from("feel/the");
+    ///
+    /// p.add_extension("force");
+    /// assert_eq!(RelativePath::new("feel/the.force"), p);
+    ///
+    /// p.add_extension("dark_side");
+    /// assert_eq!(RelativePath::new("feel/the.force.dark_side"), p);
+    ///
+    /// assert!(p.pop());
+    /// p.add_extension("nothing");
+    /// assert_eq!(RelativePath::new("feel.nothing"), p);
+    /// ```
+    pub fn add_extension<S>(&mut self, extension: S) -> bool
+    where
+        S: AsRef<str>,
+    {
+        let file_name = match self.file_name() {
+            Some(stem) => stem,
+            None => return false,
+        };
+
+        let extension = extension.as_ref();
+
+        if !extension.is_empty() {
+            let end_file_stem = file_name[file_name.len()..].as_ptr() as usize;
+            let start = self.inner.as_ptr() as usize;
+            self.inner.truncate(end_file_stem.wrapping_sub(start));
+
+            self.inner.push(STEM_SEP);
+            self.inner.push_str(extension);
+        }
+
+        true
+    }
+
     /// Truncates `self` to [`parent`][RelativePath::parent].
     ///
     /// # Examples

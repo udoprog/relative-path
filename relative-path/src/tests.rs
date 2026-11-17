@@ -402,6 +402,36 @@ pub fn test_set_extension() {
 }
 
 #[test]
+pub fn test_add_extension() {
+    macro_rules! tae(
+            ($path:expr, $ext:expr, $expected:expr, $output:expr) => ( {
+            let mut p = RelativePathBuf::from($path);
+            let output = p.add_extension($ext);
+            assert!(p.as_str() == $expected && output == $output,
+                    "adding extension of {:?} to {:?}: Expected {:?}/{:?}, got {:?}/{:?}",
+                    $path, $ext, $expected, $output,
+                    p.as_str(), output);
+        });
+    );
+
+    tae!("foo", "txt", "foo.txt", true);
+    tae!("foo.bar", "txt", "foo.bar.txt", true);
+    tae!("foo.bar.baz", "txt", "foo.bar.baz.txt", true);
+    tae!(".test", "txt", ".test.txt", true);
+    tae!("foo.txt", "", "foo.txt", true);
+    tae!("foo", "", "foo", true);
+    tae!("", "foo", "", false);
+    tae!(".", "foo", ".", false);
+    tae!("foo/", "", "foo/", true);
+    tae!("foo/.", "", "foo/.", true);
+    tae!("foo/", "bar", "foo.bar", true);
+    tae!("foo/.", "bar", "foo.bar", true);
+    tae!("..", "foo", "..", false);
+    tae!("foo/..", "bar", "foo/..", false);
+    tae!("/", "foo", "/", false);
+}
+
+#[test]
 fn test_eq_recievers() {
     use std::borrow::Cow;
 
